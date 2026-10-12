@@ -101,6 +101,8 @@ const BenchScenario scenarios[] =
 	{ "packed",              "movebench_packed.json",               900, 0x5EEDBEEF },
 	// A strong mixed force against a weak one, for comparing target modes. Read the BATTLE lines in the log.
 	{ "targeting",           "movebench_targeting.json",           3000, 0x5EEDBEEF, false },
+	// Two equal mixed forces, the attacker with the target mode under test. Read the BATTLE lines in the log.
+	{ "duel",                "movebench_duel.json",                3000, 0x5EEDBEEF, false },
 	// The parking column past a field carrying stale move targets, and on lighter or lower-skid propulsion.
 	{ "parking_stale",       "movebench_parking_stale.json",        900, 0x5EEDBEEF },
 	{ "parking_light",       "movebench_parking_light.json",        900, 0x5EEDBEEF },
