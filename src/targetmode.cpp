@@ -26,6 +26,7 @@
 #include "objects.h"
 #include "console.h"
 
+#include <cstdlib>
 #include <string>
 
 namespace
@@ -67,8 +68,23 @@ void setGroupMode(int group, TargetMode mode)
 
 }
 
+/// For benchmarks: WZ_TARGETMODE=<number> gives every droid of the local player that mode, whatever its group.
+static int benchModeOverride()
+{
+	static const int mode = [] {
+		const char *value = std::getenv("WZ_TARGETMODE");
+		return value != nullptr ? std::atoi(value) : -1;
+	}();
+	return mode;
+}
+
 TargetMode targetModeOf(const DROID *psDroid)
 {
+	const int override = benchModeOverride();
+	if (override >= 0 && override < static_cast<int>(TargetMode::Count))
+	{
+		return psDroid->player == selectedPlayer ? static_cast<TargetMode>(override) : TargetMode::Default;
+	}
 	if (psDroid->player != selectedPlayer || psDroid->group >= NUM_GROUPS)
 	{
 		return TargetMode::Default;
