@@ -97,6 +97,8 @@ const BenchScenario scenarios[] =
 	// Congestion. One destination for everyone, and a column past parked allies.
 	{ "blob",                "movebench_blob.json",                3000, 0x5EEDBEEF },
 	{ "parking",             "movebench_parking.json",              900, 0x5EEDBEEF },
+	// One unit ordered out of the middle of a solid block of idle allies.
+	{ "packed",              "movebench_packed.json",               900, 0x5EEDBEEF },
 	// The parking column past a field carrying stale move targets, and on lighter or lower-skid propulsion.
 	{ "parking_stale",       "movebench_parking_stale.json",        900, 0x5EEDBEEF },
 	{ "parking_light",       "movebench_parking_light.json",        900, 0x5EEDBEEF },
