@@ -57,7 +57,7 @@ int main()
 		for (int i = 0; i < 6; i++) u[i].id = i + 1;
 		int ranges[] = {900, 300, 600, 1200, 0, 0};
 		int tough[] = {10, 50, 30, 5, 20, 40};
-		for (int i = 0; i < 6; i++) { u[i].range = ranges[i]; u[i].toughness = tough[i]; u[i].speed = 100 - 10 * i; u[i].pos = {i * 10, 0}; }
+		for (int i = 0; i < 6; i++) { u[i].range = ranges[i]; u[i].toughness = tough[i]; u[i].pos = {i * 10, 0}; }
 		u[3].artillery = true;
 		auto slots = makeSlots({Shape::Column, 1}, 6, S);  // a single file, slot 0 is the front
 		auto byRange = assign(u, slots, 0, SortBy::Range);
@@ -68,8 +68,6 @@ int main()
 		auto byTough = assign(u, slots, 0, SortBy::Toughness);
 		CHECK(byTough[3] == 5);   // artillery last even though it is the most fragile
 		CHECK(byTough[1] == 0);   // toughest of the rest in front
-		auto bySpeed = assign(u, slots, 0, SortBy::Speed);
-		CHECK(bySpeed[0] == 0);
 		// every unit gets its own place
 		std::set<size_t> used(byRange.begin(), byRange.end());
 		CHECK(used.size() == 6);

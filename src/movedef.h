@@ -99,6 +99,19 @@ struct MOVE_CONTROL
 	unsigned routeRetryUntil = 0;         ///< No re-request before this time, 0 outside an episode
 	uint16_t routeRetryStreak = 0;        ///< Consecutive failures, widening the gap between re-requests
 
+	/// Where an idle droid stood before it was shuffled aside to let another through, so that it can go back
+	/// once the way is clear. Not saved: a loaded game simply leaves such droids where they are.
+	Vector2i shuffleHome = Vector2i(0, 0);
+	unsigned shuffleHomeSince = 0;        ///< When it first left that spot, 0 if it has no spot to go back to
+	unsigned shuffleDisplacedAt = 0;      ///< When it was last shuffled or sent back, to pace the return
+	uint8_t shuffleHomeTries = 0;         ///< How many times it has been sent back
+	bool returningHome = false;           ///< On its way back to shuffleHome
+
+	/// A formation's speed limit, as the slowest member's base speed, for the move the formation order started.
+	/// Not synchronised, so only safe where every client sees the same orders... see formationorder.cpp.
+	unsigned formationSpeedCap = 0;       ///< 0 for no limit
+	bool formationSpeedSeenMoving = false;///< Set once the capped move is under way, so that its end lifts the limit
+
 	FORMATION *psFormation = nullptr;     ///< formation the droid is currently a member of
 
 	int iVertSpeed = 0;                   ///< VTOL movement

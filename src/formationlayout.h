@@ -70,7 +70,6 @@ enum class SortBy
 	Position,   ///< whoever is already furthest ahead stays ahead, so the units cross each other the least
 	Range,      ///< short range in front, long range behind
 	Toughness,  ///< the toughest in front
-	Speed,      ///< the fastest in front
 };
 
 struct Unit
@@ -79,7 +78,6 @@ struct Unit
 	Pt pos;             ///< current world position
 	int range = 0;      ///< weapon reach, 0 for none
 	int toughness = 0;  ///< hitpoints, armour or whatever should decide who takes the hits
-	int speed = 0;
 	bool artillery = false;  ///< indirect fire, always kept behind the rest
 };
 

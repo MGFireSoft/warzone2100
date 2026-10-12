@@ -2684,6 +2684,7 @@ void orderSelectedLoc(uint32_t player, uint32_t x, uint32_t y, bool add)
 				formationMovers.push_back(psCurr);
 				continue;
 			}
+			psCurr->sMove.formationSpeedCap = 0;
 			// see if the order can be added to the list
 			if (order != DORDER_NONE && !(add && orderDroidLocAdd(psCurr, order, x, y)))
 			{

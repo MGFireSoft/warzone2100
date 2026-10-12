@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: GPL-2.0-or-later
 
 /*
 	This file is part of Warzone 2100.
@@ -69,7 +69,6 @@ const SortChoice sortChoices[] =
 	{formation::SortBy::Position, "keep current positions"},
 	{formation::SortBy::Range, "by range, short range in front"},
 	{formation::SortBy::Toughness, "by toughness, toughest in front"},
-	{formation::SortBy::Speed, "by speed, fastest in front"},
 };
 const unsigned NUM_SORTS = sizeof(sortChoices) / sizeof(sortChoices[0]);
 
@@ -91,6 +90,7 @@ struct GroupSetting
 	unsigned shape = 0;   ///< index into shapeChoices, 0 is off
 	unsigned sort = 0;    ///< index into sortChoices
 	unsigned spacing = SPACING_NORMAL;
+	bool matchSpeed = false;  ///< the whole formation moves at the speed of its slowest unit
 };
 
 GroupSetting groupSettings[NUM_GROUPS];
@@ -133,7 +133,8 @@ void describe(unsigned group)
 	}
 	else
 	{
-		text += std::string("formation ") + shapeChoices[s.shape].name + ", " + sortChoices[s.sort].name + ", " + spacingNames[s.spacing] + " spacing";
+		text += std::string("formation ") + shapeChoices[s.shape].name + ", " + sortChoices[s.sort].name + ", " + spacingNames[s.spacing] + " spacing, "
+		        + (s.matchSpeed ? "moves at the speed of the slowest" : "each unit at its own speed");
 	}
 	addConsoleMessage(text.c_str(), DEFAULT_JUSTIFY, INFO_MESSAGE);
 }
@@ -156,7 +157,6 @@ formation::Unit unitInfo(const DROID *psDroid)
 	unit.id = psDroid->id;
 	unit.pos = {psDroid->pos.x, psDroid->pos.y};
 	unit.toughness = static_cast<int>(psDroid->originalBody);
-	unit.speed = static_cast<int>(psDroid->baseSpeed);
 
 	bool anyWeapon = false;
 	bool allIndirect = true;
@@ -187,8 +187,10 @@ void layoutGroup(const std::vector<DROID *> &droids, const GroupSetting &setting
 	bool allCyborgs = true;
 	int64_t sumX = 0;
 	int64_t sumY = 0;
+	unsigned slowest = 0;
 	for (const DROID *psDroid : droids)
 	{
+		slowest = (slowest == 0) ? psDroid->baseSpeed : std::min<unsigned>(slowest, psDroid->baseSpeed);
 		units.push_back(unitInfo(psDroid));
 		maxRadius = std::max(maxRadius, moveObjRadius(psDroid));
 		allCyborgs = allCyborgs && psDroid->isCyborg();
@@ -214,6 +216,8 @@ void layoutGroup(const std::vector<DROID *> &droids, const GroupSetting &setting
 		int wx = world.x;
 		int wy = world.y;
 		clip_world_offmap(gameWorld.map, &wx, &wy);
+		droids[i]->sMove.formationSpeedCap = setting.matchSpeed ? slowest : 0;
+		droids[i]->sMove.formationSpeedSeenMoving = false;
 		issue(droids[i], wx, wy);
 	}
 }
@@ -269,6 +273,17 @@ void kf_FormationNextSpacing()
 	if (setting != nullptr)
 	{
 		setting->spacing = (setting->spacing + 1) % NUM_SPACINGS;
+		describe(group);
+	}
+}
+
+void kf_FormationToggleMatchSpeed()
+{
+	int group;
+	GroupSetting *setting = selectedSetting(group);
+	if (setting != nullptr)
+	{
+		setting->matchSpeed = !setting->matchSpeed;
 		describe(group);
 	}
 }

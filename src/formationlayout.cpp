@@ -171,12 +171,6 @@ std::vector<size_t> assign(const std::vector<Unit> &units, const std::vector<Pt>
 				return ua.toughness > ub.toughness;
 			}
 			break;
-		case SortBy::Speed:
-			if (ua.speed != ub.speed)
-			{
-				return ua.speed > ub.speed;
-			}
-			break;
 		case SortBy::Position:
 			break;
 		}

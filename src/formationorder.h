@@ -49,4 +49,5 @@ void formationIssueMoves(const std::vector<DROID *> &droids, int x, int y, const
 void kf_FormationNextShape();
 void kf_FormationNextSort();
 void kf_FormationNextSpacing();
+void kf_FormationToggleMatchSpeed();
 void kf_FormationOff();

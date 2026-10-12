@@ -260,6 +260,10 @@ static bool moveDroidToBase(DROID *psDroid, UDWORD x, UDWORD y, bool bFormation,
 
 	CHECK_DROID(psDroid);
 
+	// a droid with somewhere to go no longer goes back to where it was shuffled from
+	psDroid->sMove.shuffleHomeSince = 0;
+	psDroid->sMove.returningHome = false;
+
 	// in multiPlayer make Transporter move like the vtols
 	if (psDroid->isTransporter() && game.maxPlayers == 0)
 	{
@@ -563,6 +567,16 @@ static void moveShuffleDroid(DROID *psDroid, Vector2i s, int chainDepth = 0, std
 		actionVTOLLandingPos(psDroid, &tar);
 	}
 
+
+	// remember where it was, to go back once the way is clear
+	if (psDroid->sMove.shuffleHomeSince == 0)
+	{
+		psDroid->sMove.shuffleHome = psDroid->pos.xy();
+		psDroid->sMove.shuffleHomeSince = gameTime;
+		psDroid->sMove.shuffleHomeTries = 0;
+	}
+	psDroid->sMove.shuffleDisplacedAt = gameTime;
+	psDroid->sMove.returningHome = false;
 
 	// set up the move state
 	if (psDroid->sMove.Status != MOVESHUFFLE)
@@ -1543,6 +1557,11 @@ static void moveCalcDroidSlide(DROID *psDroid, int *pmx, int *pmy)
 
 	for (DROID *psShuffleDroid : shuffleCandidates)
 	{
+		if (psDroid->sMove.returningHome)
+		{
+			// a droid going back to its place does not push others out of theirs
+			break;
+		}
 		const bool sameSide = psShuffleDroid->player == psDroid->player || aiCheckAlliances(psShuffleDroid->player, psDroid->player);
 
 		if (sameSide
@@ -1828,6 +1847,13 @@ SDWORD moveCalcDroidSpeed(DROID *psDroid)
 		{
 			speed = FrmSpeed;
 		}
+	}
+
+	// a formation moving at the speed of its slowest member
+	if (psDroid->sMove.formationSpeedCap != 0 && psDroid->baseSpeed > psDroid->sMove.formationSpeedCap)
+	{
+		speed = speed * static_cast<int>(psDroid->sMove.formationSpeedCap) / static_cast<int>(psDroid->baseSpeed);
+		psDroid->sMove.formationSpeedSeenMoving = true;
 	}
 
 	// slow down shuffling VTOLs
@@ -2569,6 +2595,80 @@ static bool droidMovingToWork(const DROID *psDroid)
 
 
 /* Frame update for the movement of a tracked droid */
+// How long a shuffled droid stays put after the last push before it goes back to its place,
+// how long it keeps trying before it gives up, and how many times it is sent back.
+#define RETURN_HOME_DELAY	1500
+#define RETURN_HOME_GIVEUP	20000
+#define RETURN_HOME_TRIES	3
+// Close enough to its place to count as being there
+#define RETURN_HOME_DONE	(TILE_UNITS / 3)
+// How far around it to look for traffic that is still going through
+#define RETURN_HOME_TRAFFIC	(TILE_UNITS * 3)
+
+// Sends an idle droid that was shuffled aside back to where it stood, once nothing is passing any more and
+// its old place is free. Droids that have been given something to do, or that are fighting, stay where they are.
+static void moveReturnHome(DROID *psDroid)
+{
+	MOVE_CONTROL &m = psDroid->sMove;
+	if (m.shuffleHomeSince == 0)
+	{
+		return;
+	}
+	if (psDroid->action != DACTION_NONE || psDroid->isFlying()
+	    || gameTime > m.shuffleHomeSince + RETURN_HOME_GIVEUP || m.shuffleHomeTries >= RETURN_HOME_TRIES
+	    || iHypot(m.shuffleHome - psDroid->pos.xy()) <= RETURN_HOME_DONE)
+	{
+		m.shuffleHomeSince = 0;
+		m.returningHome = false;
+		return;
+	}
+	if (gameTime < m.shuffleDisplacedAt + RETURN_HOME_DELAY)
+	{
+		return;
+	}
+
+	const int selfRadius = moveObjRadius(psDroid);
+	for (BASE_OBJECT *psObj : gridStartIterate(psDroid->pos.x, psDroid->pos.y, RETURN_HOME_TRAFFIC))
+	{
+		const DROID *psOther = castDroid(psObj);
+		if (psOther == nullptr || psOther == psDroid || psOther->died || psOther->isFlying())
+		{
+			continue;
+		}
+		const bool friendly = psOther->player == psDroid->player || aiCheckAlliances(psOther->player, psDroid->player);
+		if (friendly && psOther->sMove.Status != MOVEINACTIVE && !psOther->sMove.returningHome)
+		{
+			return;  // someone is still passing
+		}
+	}
+	for (BASE_OBJECT *psObj : gridStartIterate(m.shuffleHome.x, m.shuffleHome.y, TILE_UNITS * 2))
+	{
+		const DROID *psOther = castDroid(psObj);
+		if (psOther == nullptr || psOther == psDroid || psOther->died || psOther->isFlying())
+		{
+			continue;
+		}
+		if (iHypot(psOther->pos.xy() - m.shuffleHome) < selfRadius + moveObjRadius(psOther))
+		{
+			return;  // its place is taken
+		}
+	}
+
+	m.returningHome = true;
+	m.shuffleHomeTries++;
+	m.shuffleDisplacedAt = gameTime;
+	m.shuffleStart = gameTime;
+	m.src = psDroid->pos.xy();
+	m.target = m.shuffleHome;
+	m.clearRoute();
+	if (m.psFormation != nullptr)
+	{
+		formationLeave(m.psFormation, psDroid);
+		m.psFormation = nullptr;
+	}
+	m.Status = MOVESHUFFLE;
+}
+
 void moveUpdateDroid(DROID *psDroid)
 {
 	WZ_PERF_SCOPE(T_moveUpdateDroid);
@@ -2622,6 +2722,13 @@ void moveUpdateDroid(DROID *psDroid)
 		{
 			resetObjectAnimationState(psDroid);
 		}
+		if (psDroid->sMove.formationSpeedSeenMoving)
+		{
+			// the capped move is over
+			psDroid->sMove.formationSpeedCap = 0;
+			psDroid->sMove.formationSpeedSeenMoving = false;
+		}
+		moveReturnHome(psDroid);
 		if (bStopped)
 		{
 			if (psDroid->sMove.psFormation && (psDroid->sMove.pathIndex == (int)psDroid->sMove.asPath.size()))
