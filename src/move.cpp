@@ -1312,6 +1312,19 @@ static bool moveSoftPass(const DROID *self, const DROID *other)
 	return abs(diff) < DEG(60);
 }
 
+// Ask a stationary friendly droid that is in the way of a mover to step aside.
+// The push direction is where the mover is heading. A mover that has no target of its own yet (it may still be waiting
+// for a route) falls back to the way it is facing, so that the blocker is still asked to move.
+static void moveRequestShuffle(DROID *psMover, DROID *psBlocker)
+{
+	Vector2i pushDir = psMover->sMove.target - psMover->pos.xy();
+	if (pushDir == Vector2i(0, 0))
+	{
+		pushDir = iSinCosR(psMover->rot.direction, TILE_UNITS);
+	}
+	moveShuffleDroid(psBlocker, pushDir);
+}
+
 // see if a droid has run into another droid
 // Only consider stationery droids
 static void moveCalcDroidSlide(DROID *psDroid, int *pmx, int *pmy)
@@ -1343,6 +1356,9 @@ static void moveCalcDroidSlide(DROID *psDroid, int *pmx, int *pmy)
 	const int32_t steppedY = psDroid->pos.y + spmy;
 
 	BASE_OBJECT *psObst = nullptr;
+	bool hardStopped = false;
+	// Every friendly droid in the way gets asked to step aside, not only the first one hit
+	std::vector<DROID *> shuffleCandidates;
 	for (BASE_OBJECT *psObj : gridStartIterate(psDroid->pos.x, psDroid->pos.y, OBJ_MAXRADIUS))
 	{
 		if (psObj->died)
@@ -1405,9 +1421,20 @@ static void moveCalcDroidSlide(DROID *psDroid, int *pmx, int *pmy)
 
 		if (radSq > distSq)
 		{
+			if (hardStopped)
+			{
+				// already stopped, only collecting the other blockers
+				if (psObj->type == OBJ_DROID)
+				{
+					shuffleCandidates.push_back(static_cast<DROID *>(psObj));
+				}
+				continue;
+			}
 			if (psObst != nullptr)
 			{
 				// hit more than one droid - stop
+				// the first blocker is already queued, this is the second
+				shuffleCandidates.push_back(static_cast<DROID *>(psObj));
 				*pmx = 0;
 				*pmy = 0;
 				psObst = nullptr;
@@ -1428,7 +1455,8 @@ static void moveCalcDroidSlide(DROID *psDroid, int *pmx, int *pmy)
 						g_moveMetrics->hardStopsNear++;
 					}
 				}
-				break;
+				hardStopped = true;
+				continue;
 			}
 			else
 			{
@@ -1456,21 +1484,24 @@ static void moveCalcDroidSlide(DROID *psDroid, int *pmx, int *pmy)
 					}
 				}
 
-				// tell inactive droids to get out the way
-				if (psObst && psObst->type == OBJ_DROID)
+				// inactive droids get told to get out the way once the scan is done
+				if (psObst->type == OBJ_DROID)
 				{
-					DROID *psShuffleDroid = (DROID *)psObst;
-
-					const bool sameSide = psObst->player == psDroid->player || aiCheckAlliances(psObst->player, psDroid->player);
-
-					if (sameSide
-					    && psShuffleDroid->action != DACTION_WAITDURINGREARM
-					    && psShuffleDroid->sMove.Status == MOVEINACTIVE)
-					{
-						moveShuffleDroid(psShuffleDroid, psDroid->sMove.target - psDroid->pos.xy());
-					}
+					shuffleCandidates.push_back(static_cast<DROID *>(psObst));
 				}
 			}
+		}
+	}
+
+	for (DROID *psShuffleDroid : shuffleCandidates)
+	{
+		const bool sameSide = psShuffleDroid->player == psDroid->player || aiCheckAlliances(psShuffleDroid->player, psDroid->player);
+
+		if (sameSide
+		    && psShuffleDroid->action != DACTION_WAITDURINGREARM
+		    && psShuffleDroid->sMove.Status == MOVEINACTIVE)
+		{
+			moveRequestShuffle(psDroid, psShuffleDroid);
 		}
 	}
 
