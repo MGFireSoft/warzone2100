@@ -410,9 +410,23 @@ void moveTurnDroid(DROID *psDroid, UDWORD x, UDWORD y)
 	}
 }
 
-// Tell a droid to move out the way for a shuffle
-static void moveShuffleDroid(DROID *psDroid, Vector2i s)
+// How many droids deep a shuffle may ask the neighbours that box a droid in to make room as well
+#define SHUFFLE_CHAIN_DEPTH	5
+
+// Tell a droid to move out the way for a shuffle.
+// A droid with no free side is boxed in by its neighbours, so before it gives way (or gives up) it asks the allies
+// beside it and in front of it to step aside the same way, up to SHUFFLE_CHAIN_DEPTH droids deep and each droid at
+// most once per request. That opens room for it on a later tick, so a block of idle droids parts outwards instead of
+// only the first one touched moving.
+static void moveShuffleDroid(DROID *psDroid, Vector2i s, int chainDepth = 0, std::vector<UDWORD> *visited = nullptr)
 {
+	std::vector<UDWORD> ownVisited;
+	if (visited == nullptr)
+	{
+		visited = &ownVisited;
+	}
+	visited->push_back(psDroid->id);
+
 	SDWORD  mx, my;
 	bool	frontClear = true, leftClear = true, rightClear = true;
 	SDWORD	lvx, lvy, rvx, rvy, svx, svy;
@@ -462,6 +476,7 @@ static void moveShuffleDroid(DROID *psDroid, Vector2i s)
 	}
 
 	// find any droids that could block the shuffle
+	std::vector<DROID *> neighbours;
 	for (BASE_OBJECT *gridObj : gridStartIterate(psDroid->pos.x, psDroid->pos.y, SHUFFLE_DIST))
 	{
 		DROID *psCurr = castDroid(gridObj);
@@ -475,10 +490,43 @@ static void moveShuffleDroid(DROID *psDroid, Vector2i s)
 		if (diff > DEG(45) && diff < DEG(135))
 		{
 			leftClear = false;
+			neighbours.push_back(psCurr);
 		}
 		else if (diff > -DEG(135) && diff < -DEG(45))
 		{
 			rightClear = false;
+			neighbours.push_back(psCurr);
+		}
+		else if (diff >= -DEG(45) && diff <= DEG(45))
+		{
+			// in front, in the way of a shuffle straight ahead
+			neighbours.push_back(psCurr);
+		}
+	}
+
+	// boxed in on both sides: ask the neighbours beside and ahead to make room
+	if (!leftClear && !rightClear && chainDepth < SHUFFLE_CHAIN_DEPTH)
+	{
+		bool askedNeighbour = false;
+		for (DROID *psNeighbour : neighbours)
+		{
+			if (std::find(visited->begin(), visited->end(), psNeighbour->id) != visited->end())
+			{
+				continue;
+			}
+			const bool friendly = psNeighbour->player == psDroid->player || aiCheckAlliances(psNeighbour->player, psDroid->player);
+			if (friendly
+			    && psNeighbour->action != DACTION_WAITDURINGREARM
+			    && psNeighbour->sMove.Status == MOVEINACTIVE)
+			{
+				moveShuffleDroid(psNeighbour, s, chainDepth + 1, visited);
+				askedNeighbour = true;
+			}
+		}
+		if (askedNeighbour)
+		{
+			// Stay put for now, the room the neighbours are making opens a side for the next request
+			return;
 		}
 	}
 
