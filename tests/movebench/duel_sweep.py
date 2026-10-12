@@ -3,10 +3,10 @@
 import os, re, subprocess, statistics, json
 
 EXE = r"F:\wz-build\src\warzone2100.exe"
-MODES = ["default", "by type", "nearest", "weakest", "structures", "units", "smart"]
+MODES = ["default", "by type", "smart"]
 SEEDS = [None, 111]
 ARRANGEMENTS = range(9)
-A0, D0 = 2600.0, 2400.0   # starting health sums
+A0, D0 = 3000.0, 2200.0   # starting health sums
 
 pattern = re.compile(r"BATTLE t=(\d+) attacker=(\d+) health=(\d+) defender=(\d+) health=(\d+) towers=(\d+)")
 results = {m: [] for m in MODES}

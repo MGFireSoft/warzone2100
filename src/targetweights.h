@@ -33,11 +33,7 @@ enum class TargetMode
 {
 	Default,     ///< the game's own weighting
 	ByType,      ///< what the weapon is good against counts for much more
-	Nearest,     ///< whatever is closest
-	Weakest,     ///< the one that is closest to dying
-	Structures,  ///< structures before units
-	Units,       ///< units before structures
-	Smart,       ///< weapon fit first, then weakest, never a target the weapon is poor against while there is another
+	Smart,       ///< what the weapon is good against decides almost everything, and a poor match is avoided
 	Count,
 };
 

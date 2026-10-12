@@ -3,7 +3,7 @@
 import os, re, subprocess, statistics, sys, json
 
 EXE = r"F:\wz-build\src\warzone2100.exe"
-MODES = ["default", "by type", "nearest", "weakest", "structures", "units", "smart"]
+MODES = ["default", "by type", "smart"]
 SEEDS = [None, 111]
 ARRANGEMENTS = range(9)
 

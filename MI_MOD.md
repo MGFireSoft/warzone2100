@@ -18,5 +18,5 @@ Los cambios propios se desarrollan en la rama `mi-mod`.
   Se manejan con Ctrl+F1 (forma), Ctrl+F2 (orden), Ctrl+F3 (separacion), Ctrl+F5 (velocidad), Ctrl+F4 (apagar) sobre un grupo Ctrl+numero.
 - **Las unidades que se corren vuelven a su lugar** una vez que pasa la que las empujo (`moveReturnHome` en `src/move.cpp`).
 - **Evitacion de obstaculos**: el tanque mantiene el lado elegido para esquivar en vez de cambiarlo en cada tick (`collision_avoidance_behavior.cpp`).
-- **Modos de objetivo por grupo** (`src/targetweights.*`, `src/targetmode.*`): por defecto, por tipo, mas cercano, mas debil,
-  estructuras primero, unidades primero e inteligente. Ctrl+F6 siguiente modo, Ctrl+F7 vuelve al por defecto, sobre un grupo Ctrl+numero.
+- **Modos de objetivo por grupo** (`src/targetweights.*`, `src/targetmode.*`): por defecto, por tipo e inteligente.
+  Ctrl+F6 siguiente modo, Ctrl+F7 vuelve al por defecto, sobre un grupo Ctrl+numero.
