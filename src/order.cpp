@@ -39,6 +39,7 @@
 #include "map.h"
 #include "formationdef.h"
 #include "formation.h"
+#include "formationorder.h"
 #include "objmem.h"
 #include "projectile.h"
 #include "effects.h"	// for waypoint display
@@ -2662,6 +2663,9 @@ void orderSelectedLoc(uint32_t player, uint32_t x, uint32_t y, bool add)
 	// note that an order list graphic needs to be displayed
 	bOrderEffectDisplayed = false;
 
+	// droids of a group with a formation set are not sent to the spot one by one, they are laid out together afterwards
+	std::vector<DROID *> formationMovers;
+
 	for (DROID* psCurr : gameWorld.objects.droids[player])
 	{
 		if (psCurr->selected)
@@ -2675,6 +2679,11 @@ void orderSelectedLoc(uint32_t player, uint32_t x, uint32_t y, bool add)
 			}
 
 			order = chooseOrderLoc(psCurr, x, y, specialOrderKeyDown());
+			if (order == DORDER_MOVE && formationGroupActive(psCurr))
+			{
+				formationMovers.push_back(psCurr);
+				continue;
+			}
 			// see if the order can be added to the list
 			if (order != DORDER_NONE && !(add && orderDroidLocAdd(psCurr, order, x, y)))
 			{
@@ -2682,6 +2691,16 @@ void orderSelectedLoc(uint32_t player, uint32_t x, uint32_t y, bool add)
 				orderDroidLoc(psCurr, order, x, y, ModeQueue);
 			}
 		}
+	}
+
+	if (!formationMovers.empty())
+	{
+		formationIssueMoves(formationMovers, x, y, [add](DROID *psDroid, int destX, int destY) {
+			if (!(add && orderDroidLocAdd(psDroid, DORDER_MOVE, destX, destY)))
+			{
+				orderDroidLoc(psDroid, DORDER_MOVE, destX, destY, ModeQueue);
+			}
+		});
 	}
 }
 

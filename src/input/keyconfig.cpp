@@ -26,6 +26,7 @@
 #include "lib/framework/input.h"
 
 #include "../keybind.h"
+#include "../formationorder.h"
 
 // Definitions/Configuration for all mappable Key Functions
 //
@@ -74,6 +75,10 @@ static void initializeKeyFunctions(std::vector<KeyFunctionInfo>& entries)
 	entries.emplace_back(KeyFunctionInfo(InputContext::GAMEPLAY,            KeyMappingType::ASSIGNABLE,  kf_AddGrouping_N(8),                                           "AddGrouping_8",                N_("Add to Group 8"),                               {{ KeyMappingSlot::PRIMARY, { KEY_CODE::KEY_LSHIFT,     KEY_CODE::KEY_8,            } }}));
 	entries.emplace_back(KeyFunctionInfo(InputContext::GAMEPLAY,            KeyMappingType::ASSIGNABLE,  kf_AddGrouping_N(9),                                           "AddGrouping_9",                N_("Add to Group 9"),                               {{ KeyMappingSlot::PRIMARY, { KEY_CODE::KEY_LSHIFT,     KEY_CODE::KEY_9,            } }}));
 	// REMOVE FROM GROUP
+	entries.emplace_back(KeyFunctionInfo(InputContext::GAMEPLAY,            KeyMappingType::ASSIGNABLE,  kf_FormationNextShape,                                         "FormationNextShape",           N_("Group Formation: Next Shape"),                  {{ KeyMappingSlot::PRIMARY, { KEY_CODE::KEY_LCTRL,      KEY_CODE::KEY_F1            } }}));
+	entries.emplace_back(KeyFunctionInfo(InputContext::GAMEPLAY,            KeyMappingType::ASSIGNABLE,  kf_FormationNextSort,                                          "FormationNextSort",            N_("Group Formation: Next Order of Units"),         {{ KeyMappingSlot::PRIMARY, { KEY_CODE::KEY_LCTRL,      KEY_CODE::KEY_F2            } }}));
+	entries.emplace_back(KeyFunctionInfo(InputContext::GAMEPLAY,            KeyMappingType::ASSIGNABLE,  kf_FormationNextSpacing,                                       "FormationNextSpacing",         N_("Group Formation: Next Spacing"),                {{ KeyMappingSlot::PRIMARY, { KEY_CODE::KEY_LCTRL,      KEY_CODE::KEY_F3            } }}));
+	entries.emplace_back(KeyFunctionInfo(InputContext::GAMEPLAY,            KeyMappingType::ASSIGNABLE,  kf_FormationOff,                                               "FormationOff",                 N_("Group Formation: Off"),                         {{ KeyMappingSlot::PRIMARY, { KEY_CODE::KEY_LCTRL,      KEY_CODE::KEY_F4            } }}));
 	entries.emplace_back(KeyFunctionInfo(InputContext::GAMEPLAY,            KeyMappingType::ASSIGNABLE,  kf_RemoveFromGrouping(),                                       "RemoveFromGrouping",           N_("Remove from current Group"),                    {}));
 
 	// SELECT GROUPS - Will jump to the group as well as select if group is ALREADY selected
