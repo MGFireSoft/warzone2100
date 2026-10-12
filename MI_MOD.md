@@ -20,3 +20,5 @@ Los cambios propios se desarrollan en la rama `mi-mod`.
 - **Evitacion de obstaculos**: el tanque mantiene el lado elegido para esquivar en vez de cambiarlo en cada tick (`collision_avoidance_behavior.cpp`).
 - **Modos de objetivo por grupo** (`src/targetweights.*`, `src/targetmode.*`): por defecto, por tipo e inteligente.
   Ctrl+F6 siguiente modo, Ctrl+F7 vuelve al por defecto, sobre un grupo Ctrl+numero.
+- **Modo de objetivo inteligente por tipo de arma** (`src/targetweights.cpp`, `src/targetsmart.cpp`): cada arma tiene su orden de prioridad
+  (artilleria contra artilleria, anti-tanque guarda sus tiros para tanques, bunker buster a estructuras, etc.). Prueba: `--movementbench=assault`.

@@ -449,7 +449,18 @@ static SDWORD targetAttackWeightIfGreaterThan(SDWORD currentBest, BASE_OBJECT *p
 			terms.typeBonus = targetTypeBonus;
 			terms.hitpoints = static_cast<int>(targetDroid->body);
 			terms.isStructure = false;
-			attackWeight = targetModeWeight(targetMode, terms);
+			if (targetMode == TargetMode::Smart)
+			{
+				attackWeight = targetModeSmartWeight(psAttackerDroid, attackerWeapon, psTarget, terms);
+				if (attackWeight < 0)
+				{
+					return noTarget;	// the smart mode holds its fire on this one
+				}
+			}
+			else
+			{
+				attackWeight = targetModeWeight(targetMode, terms);
+			}
 		}
 
 		/* If attacking with EMP try to avoid targets that were already "EMPed" */
@@ -504,7 +515,18 @@ static SDWORD targetAttackWeightIfGreaterThan(SDWORD currentBest, BASE_OBJECT *p
 			terms.typeBonus = targetTypeBonus;
 			terms.hitpoints = static_cast<int>(targetStructure->body);
 			terms.isStructure = true;
-			attackWeight = targetModeWeight(targetMode, terms);
+			if (targetMode == TargetMode::Smart)
+			{
+				attackWeight = targetModeSmartWeight(psAttackerDroid, attackerWeapon, psTarget, terms);
+				if (attackWeight < 0)
+				{
+					return noTarget;	// the smart mode holds its fire on this one
+				}
+			}
+			else
+			{
+				attackWeight = targetModeWeight(targetMode, terms);
+			}
 		}
 
 		/* Go for unfinished structures only if nothing else found (same for non-visible structures) */
@@ -940,6 +962,7 @@ bool aiChooseTarget(BASE_OBJECT *psObj, BASE_OBJECT **ppsTarget, int weapon_slot
 		    && aiDroidHasRange((DROID *)psObj, psTarget, weapon_slot))
 		{
 			ASSERT(!isDead(psTarget), "Droid found a dead target!");
+			targetModeLogChoice(static_cast<DROID *>(psObj), weapon_slot, psTarget);
 			*ppsTarget = psTarget;
 			return true;
 		}

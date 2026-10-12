@@ -33,6 +33,16 @@
 
 struct DROID;
 
+struct BASE_OBJECT;
+struct WEAPON_STATS;
+
+/// The weight of a target for an attacker in the smart mode, or -1 to hold fire. Looks at what the attacker's weapon
+/// is for, what the target is, and what the attacker knows about the enemy around it.
+int targetModeSmartWeight(const DROID *attacker, const WEAPON_STATS *weapon, const BASE_OBJECT *target, const TargetTerms &terms);
+
+/// For benchmarks: when the WZ_TARGETLOG environment variable is set, says in the log what kind of weapon chose what kind of target.
+void targetModeLogChoice(const DROID *attacker, int weaponSlot, const BASE_OBJECT *target);
+
 /// The mode that applies to a droid: its group's mode if it belongs to one of the local player's groups,
 /// the game's own weighting otherwise.
 TargetMode targetModeOf(const DROID *psDroid);
