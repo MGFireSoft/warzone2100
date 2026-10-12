@@ -411,3 +411,55 @@ bool targetModeSmartWallShots()
 	}();
 	return on;
 }
+
+namespace
+{
+
+/// Where a target stands in the smart order of priority for an attacker's weapon, -1 for hold fire.
+int smartTier(const DROID *attacker, const WEAPON_STATS *weapon, const BASE_OBJECT *target)
+{
+	SmartFacts facts;
+	facts.role = weaponRole(weapon, attacker->player);
+	facts.kind = kindOf(target);
+	if (target->type == OBJ_DROID)
+	{
+		facts.fit = asWeaponModifier[weapon->weaponEffect][static_cast<const DROID *>(target)->getPropulsionStats()->propulsionType];
+	}
+	else
+	{
+		facts.fit = 100;
+	}
+	facts.tanksKnown = tanksKnownNear(attacker);
+	facts.structuresNear = structuresNear(attacker);
+	facts.waitedLong = waitedLongForTanks(attacker);
+	facts.clusterSize = clusterAround(target);
+	return smartPriority(facts);
+}
+
+}
+
+void targetModeLogShotCheck(const SIMPLE_OBJECT *attackerObj, const BASE_OBJECT *actual, int weaponSlot)
+{
+	static const bool enabled = std::getenv("WZ_TARGETLOG") != nullptr;
+	if (!enabled || attackerObj == nullptr || actual == nullptr || attackerObj->type != OBJ_DROID || attackerObj->player != selectedPlayer)
+	{
+		return;
+	}
+	DROID *attacker = const_cast<DROID *>(static_cast<const DROID *>(attackerObj));
+	const WEAPON_STATS *weapon = attacker->getWeaponStats(weaponSlot);
+	if (weapon == nullptr)
+	{
+		return;
+	}
+	// asking for the best target must not disturb the unit, so what the search records about itself is put back
+	const unsigned failedBefore = attacker->lastCheckNearestTargetFailed[weaponSlot];
+	BASE_OBJECT *best = nullptr;
+	aiBestNearestTarget(attacker, &best, weaponSlot);
+	attacker->lastCheckNearestTargetFailed[weaponSlot] = failedBefore;
+
+	debug(LOG_INFO, "SHOTCHK role=%d actual=%d best=%d tierActual=%d tierBest=%d order=%d action=%d same=%d",
+	      static_cast<int>(weaponRole(weapon, attacker->player)), static_cast<int>(kindOf(actual)),
+	      best != nullptr ? static_cast<int>(kindOf(best)) : -1,
+	      smartTier(attacker, weapon, actual), best != nullptr ? smartTier(attacker, weapon, best) : -2,
+	      static_cast<int>(attacker->order.type), static_cast<int>(attacker->action), best == actual ? 1 : 0);
+}

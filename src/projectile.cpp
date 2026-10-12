@@ -494,6 +494,7 @@ static PROJECTILE* proj_SendProjectileAngledInternal(WEAPON* psWeap, SIMPLE_OBJE
 	ASSERT_OR_RETURN(nullptr, psTarget == nullptr || !psTarget->died, "Aiming at dead target!");
 
 	targetModeLogShot(player, psStats, false);
+	targetModeLogShotCheck(psAttacker, psTarget, weapon_slot);
 
 	PROJECTILE proj(ProjectileTrackerID + ++projectileTrackerIDIncrement, player);
 

@@ -22,3 +22,5 @@ Los cambios propios se desarrollan en la rama `mi-mod`.
   Ctrl+F6 siguiente modo, Ctrl+F7 vuelve al por defecto, sobre un grupo Ctrl+numero.
 - **Modo de objetivo inteligente por tipo de arma** (`src/targetweights.cpp`, `src/targetsmart.cpp`): cada arma tiene su orden de prioridad
   (artilleria contra artilleria, anti-tanque guarda sus tiros para tanques, bunker buster a estructuras, etc.). Prueba: `--movementbench=assault`.
+- **Medicion de si algo pasa por encima del modo de objetivo** (`tests/movebench/target_agreement.py`): en modo inteligente el 72 % de los disparos
+  va al mismo objetivo que elige el modo, el 22 % a un muro que bloquea la linea de tiro (regla del juego, conservada a proposito) y el resto casi nunca peor.

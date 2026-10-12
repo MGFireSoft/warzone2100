@@ -47,6 +47,13 @@ void targetModeLogChoice(const DROID *attacker, int weaponSlot, const BASE_OBJEC
 /// nothing to hit because it missed or its target was already gone.
 void targetModeLogShot(unsigned player, const WEAPON_STATS *weapon, bool lost);
 
+struct SIMPLE_OBJECT;
+
+/// For benchmarks, with WZ_TARGETLOG set: as a shot of the local player is fired, says what the shooter is firing at and
+/// what the target choice would give right now, and where each stands in the smart order of priority. When they differ,
+/// something other than the target choice decided what the unit shoots at.
+void targetModeLogShotCheck(const SIMPLE_OBJECT *attacker, const BASE_OBJECT *actual, int weaponSlot);
+
 /// Whether the smart mode refuses to shoot through an enemy wall, looking for another target instead.
 bool targetModeSmartWallShots();
 
