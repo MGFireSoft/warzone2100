@@ -39,6 +39,7 @@
 #include "visibility.h"
 #include "game_world.h"
 #include "perfcounters.h"
+#include "targetmode.h"
 
 /* Weights used for target selection code,
  * target distance is used as 'common currency'
@@ -351,6 +352,9 @@ static SDWORD targetAttackWeightIfGreaterThan(SDWORD currentBest, BASE_OBJECT *p
 		return noTarget;
 	}
 
+	// the target mode of the attacker's group, if it has one
+	const TargetMode targetMode = (psAttackerDroid != nullptr) ? targetModeOf(psAttackerDroid) : TargetMode::Default;
+
 	bDirect = proj_Direct(attackerWeapon);
 	if (psAttacker->type == OBJ_DROID && psAttackerDroid->droidType == DROID_SENSOR)
 	{
@@ -435,6 +439,19 @@ static SDWORD targetAttackWeightIfGreaterThan(SDWORD currentBest, BASE_OBJECT *p
 		               + WEIGHT_HEALTH_DROID * damageRatio / 100 // we prefer damaged droids
 		               + targetTypeBonus; // some droid types have higher priority
 
+		if (targetMode != TargetMode::Default)
+		{
+			TargetTerms terms;
+			terms.fit = asWeaponModifier[weaponEffect][targetDroid->getPropulsionStats()->propulsionType]
+			            + asWeaponModifierBody[weaponEffect][targetDroid->getBodyStats()->size];
+			terms.distance = WEIGHT_DIST_TILE_DROID * objSensorRange(psAttacker) / TILE_UNITS - WEIGHT_DIST_TILE_DROID * dist / TILE_UNITS;
+			terms.health = WEIGHT_HEALTH_DROID * damageRatio / 100;
+			terms.typeBonus = targetTypeBonus;
+			terms.hitpoints = static_cast<int>(targetDroid->body);
+			terms.isStructure = false;
+			attackWeight = targetModeWeight(targetMode, terms);
+		}
+
 		/* If attacking with EMP try to avoid targets that were already "EMPed" */
 		if (bEmpWeap &&
 		    (targetDroid->lastHitWeapon == WSC_EMP) &&
@@ -477,6 +494,18 @@ static SDWORD targetAttackWeightIfGreaterThan(SDWORD currentBest, BASE_OBJECT *p
 		               - WEIGHT_DIST_TILE_STRUCT * dist / TILE_UNITS // farther structs are less attractive
 		               + WEIGHT_HEALTH_STRUCT * damageRatio / 100 // we prefer damaged structures
 		               + targetTypeBonus; // some structure types have higher priority
+
+		if (targetMode != TargetMode::Default)
+		{
+			TargetTerms terms;
+			terms.fit = asStructStrengthModifier[weaponEffect][targetStructure->pStructureType->strength];
+			terms.distance = WEIGHT_DIST_TILE_STRUCT * objSensorRange(psAttacker) / TILE_UNITS - WEIGHT_DIST_TILE_STRUCT * dist / TILE_UNITS;
+			terms.health = WEIGHT_HEALTH_STRUCT * damageRatio / 100;
+			terms.typeBonus = targetTypeBonus;
+			terms.hitpoints = static_cast<int>(targetStructure->body);
+			terms.isStructure = true;
+			attackWeight = targetModeWeight(targetMode, terms);
+		}
 
 		/* Go for unfinished structures only if nothing else found (same for non-visible structures) */
 		if (targetStructure->status != SS_BUILT)		//a decoy?
