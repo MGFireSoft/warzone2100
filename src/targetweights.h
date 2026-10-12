@@ -92,6 +92,12 @@ struct SmartFacts
 	int clusterSize = 0;          ///< other enemy droids close around the target
 	bool waitedLong = false;      ///< no tank has turned up for a long time since the fighting began, so waiting for one is over
 	int fit = 100;                ///< damage modifier of the weapon against the target, in percent, set from the terms
+
+	// The rules that hold fire, each of which can be switched off to see what it is worth.
+	bool ruleWalls = true;        ///< no shots at walls
+	bool ruleAntiTank = true;     ///< anti-tank weapons keep their shots for tanks
+	bool ruleAntiPersonnel = true;  ///< anti-personnel weapons ignore heavy defences
+	bool ruleBunkerBuster = true;   ///< bunker busters do not shoot units while there are structures about
 };
 
 /// The weight of a target under a mode. Higher is better. The smart mode is handled by smartTargetWeight().

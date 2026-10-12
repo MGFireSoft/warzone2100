@@ -191,7 +191,7 @@ function sweep()
 	}
 	for (var k = 0; k < attackers.length; k++)
 	{
-		if (attackers[k].order === DORDER_NONE)
+		if (attackers[k].order === 0)   // 0 is DORDER_NONE, which the scripts have no name for
 		{
 			orderDroidLoc(attackers[k], DORDER_SCOUT, best.x, best.y);
 		}

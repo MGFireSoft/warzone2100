@@ -45,6 +45,7 @@
 #include "map.h"
 #include "order.h"
 #include "projectile.h"
+#include "targetmode.h"
 #include "visibility.h"
 #include "group.h"
 #include "cmddroid.h"
@@ -491,6 +492,8 @@ static PROJECTILE* proj_SendProjectileAngledInternal(WEAPON* psWeap, SIMPLE_OBJE
 	ASSERT_OR_RETURN(nullptr, psWeap->nStat < asWeaponStats.size(), "Invalid range referenced for numWeaponStats, %d > %zu", psWeap->nStat, asWeaponStats.size());
 	ASSERT_OR_RETURN(nullptr, psStats != nullptr, "Invalid weapon stats");
 	ASSERT_OR_RETURN(nullptr, psTarget == nullptr || !psTarget->died, "Aiming at dead target!");
+
+	targetModeLogShot(player, psStats, false);
 
 	PROJECTILE proj(ProjectileTrackerID + ++projectileTrackerIDIncrement, player);
 
@@ -1258,6 +1261,7 @@ static void proj_ImpactFunc(PROJECTILE *psObj)
 	// If the projectile missed its target (or the target died)
 	if (psObj->psDest == nullptr)
 	{
+		targetModeLogShot(psObj->player, psStats, true);
 		if (gfxVisible(psObj))
 		{
 			// Get if we are facing or not

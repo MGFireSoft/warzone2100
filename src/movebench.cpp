@@ -105,6 +105,8 @@ const BenchScenario scenarios[] =
 	{ "duel",                "movebench_duel.json",                6000, 0x5EEDBEEF, false },
 	// Thirty tanks cross a defended base. The attacker has the target mode under test. Read the BATTLE lines in the log.
 	{ "assault",             "movebench_assault.json",             6000, 0x5EEDBEEF, false },
+	// A tougher defence and an attacker rich in anti-tank weapons and bunker busters. Read the BATTLE and SHOT lines in the log.
+	{ "assault2",            "movebench_assault2.json",            6000, 0x5EEDBEEF, false },
 	// The parking column past a field carrying stale move targets, and on lighter or lower-skid propulsion.
 	{ "parking_stale",       "movebench_parking_stale.json",        900, 0x5EEDBEEF },
 	{ "parking_light",       "movebench_parking_light.json",        900, 0x5EEDBEEF },

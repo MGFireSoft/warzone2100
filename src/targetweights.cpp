@@ -63,7 +63,7 @@ int smartPriority(const SmartFacts &f)
 
 	// Walls are not worth a shot, whatever the weapon. Only a bunker buster takes them, and only when there is
 	// nothing else to break nearby.
-	if (k == K::Wall)
+	if (k == K::Wall && f.ruleWalls)
 	{
 		return (f.role == TargetRole::BunkerBuster && !f.structuresNear) ? 3 : -1;
 	}
@@ -78,11 +78,11 @@ int smartPriority(const SmartFacts &f)
 		// The shots are kept for tanks. While there are tanks about, and while the fighting is young enough that
 		// they may still turn up, nothing else gets one, and anything the missile is poor against does not get one
 		// until it is clear that no tank is coming.
-		if (f.tanksKnown)
+		if (f.tanksKnown && f.ruleAntiTank)
 		{
 			return -1;
 		}
-		if (f.fit < POOR_FIT)
+		if (f.fit < POOR_FIT && f.ruleAntiTank)
 		{
 			return f.waitedLong ? IGNORE : -1;
 		}
@@ -105,7 +105,7 @@ int smartPriority(const SmartFacts &f)
 		case K::ArtilleryUnit: case K::HoverTank: case K::WheeledTank: return 2;
 		case K::HalftrackTank: case K::TrackedTank: case K::SupportUnit: case K::OtherUnit: return 3;
 		// heavy defences are not worth their ammunition, until nothing else is coming
-		default: return f.waitedLong ? IGNORE : -1;
+		default: return (f.waitedLong || !f.ruleAntiPersonnel) ? IGNORE : -1;
 		}
 
 	case TargetRole::AllRounder:
@@ -131,7 +131,7 @@ int smartPriority(const SmartFacts &f)
 			}
 		}
 		// units are not worth these shots while there is something to be broken nearby
-		if (f.structuresNear)
+		if (f.structuresNear && f.ruleBunkerBuster)
 		{
 			return -1;
 		}

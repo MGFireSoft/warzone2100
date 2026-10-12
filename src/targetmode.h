@@ -43,6 +43,13 @@ int targetModeSmartWeight(const DROID *attacker, const WEAPON_STATS *weapon, con
 /// For benchmarks: when the WZ_TARGETLOG environment variable is set, says in the log what kind of weapon chose what kind of target.
 void targetModeLogChoice(const DROID *attacker, int weaponSlot, const BASE_OBJECT *target);
 
+/// For benchmarks, with WZ_TARGETLOG set: counts a shot of the local player being fired, or one that came down with
+/// nothing to hit because it missed or its target was already gone.
+void targetModeLogShot(unsigned player, const WEAPON_STATS *weapon, bool lost);
+
+/// Whether the smart mode refuses to shoot through an enemy wall, looking for another target instead.
+bool targetModeSmartWallShots();
+
 /// The mode that applies to a droid: its group's mode if it belongs to one of the local player's groups,
 /// the game's own weighting otherwise.
 TargetMode targetModeOf(const DROID *psDroid);

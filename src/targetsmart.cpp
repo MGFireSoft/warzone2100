@@ -38,6 +38,7 @@
 #include "visibility.h"
 
 #include <cstdlib>
+#include <string>
 #include <vector>
 
 namespace
@@ -54,6 +55,16 @@ const unsigned CONTACT_LOST_TIME = 20000;
 const int STRUCTURES_NEAR_RANGE = 15 * TILE_UNITS;
 /// How close around a target other droids count towards it being a group.
 const int CLUSTER_RANGE = 2 * TILE_UNITS;
+
+/// For experiments: WZ_SMARTOFF=walls,antitank,antipersonnel,bunkerbuster,wallshots switches those rules off.
+bool smartRuleOff(const char *name)
+{
+	static const std::string off = [] {
+		const char *value = std::getenv("WZ_SMARTOFF");
+		return std::string(",") + (value != nullptr ? value : "") + ",";
+	}();
+	return off.find(std::string(",") + name + ",") != std::string::npos;
+}
 
 TargetRole weaponRole(const WEAPON_STATS *weapon, unsigned player)
 {
@@ -341,6 +352,10 @@ int targetModeSmartWeight(const DROID *attacker, const WEAPON_STATS *weapon, con
 	SmartFacts facts;
 	facts.role = weaponRole(weapon, attacker->player);
 	facts.kind = kindOf(target);
+	facts.ruleWalls = !smartRuleOff("walls");
+	facts.ruleAntiTank = !smartRuleOff("antitank");
+	facts.ruleAntiPersonnel = !smartRuleOff("antipersonnel");
+	facts.ruleBunkerBuster = !smartRuleOff("bunkerbuster");
 	if (facts.role == TargetRole::AntiTank || facts.role == TargetRole::AntiPersonnel)
 	{
 		facts.waitedLong = waitedLongForTanks(attacker);
@@ -373,4 +388,26 @@ void targetModeLogChoice(const DROID *attacker, int weaponSlot, const BASE_OBJEC
 		return;
 	}
 	debug(LOG_INFO, "TGT role=%d kind=%d", static_cast<int>(weaponRole(weapon, attacker->player)), static_cast<int>(kindOf(target)));
+}
+
+void targetModeLogShot(unsigned player, const WEAPON_STATS *weapon, bool lost)
+{
+	static const bool enabled = std::getenv("WZ_TARGETLOG") != nullptr;
+	if (!enabled || player != selectedPlayer || weapon == nullptr)
+	{
+		return;
+	}
+	debug(LOG_INFO, "SHOT role=%d lost=%d", static_cast<int>(weaponRole(weapon, player)), lost ? 1 : 0);
+}
+
+bool targetModeSmartWallShots()
+{
+	// Off by default: measured in the assault2 scenario, refusing to shoot through enemy walls cost the attacker
+	// about three tanks in thirty, because a unit with nothing else to shoot at stands silent under fire instead of
+	// opening a line of fire. WZ_SMARTON=wallshots turns it on for experiments.
+	static const bool on = [] {
+		const char *value = std::getenv("WZ_SMARTON");
+		return value != nullptr && std::string(",") + value + "," != "" && (std::string(",") + value + ",").find(",wallshots,") != std::string::npos;
+	}();
+	return on;
 }

@@ -606,6 +606,17 @@ static SDWORD targetAttackWeightIfGreaterThan(SDWORD currentBest, BASE_OBJECT *p
 		}
 		if (!lineOfFireAlreadyVerified && !lineOfFire(psAttacker, psTarget, weapon_slot, false))
 		{
+			if (targetMode == TargetMode::Smart && targetModeSmartWallShots())
+			{
+				// A target behind an enemy wall is not shot at through the wall: the unit looks for another target,
+				// or goes on until it can see this one.
+				const STRUCTURE *blockingWall = visGetBlockingWall(psAttacker, psTarget);
+				if (blockingWall != nullptr && blockingWall != static_cast<const BASE_OBJECT *>(psTarget)
+				    && !aiCheckAlliances(blockingWall->player, psAttacker->player))
+				{
+					return noTarget;
+				}
+			}
 			attackWeight /= WEIGHT_NOT_LOS_VISIBLE_F; // Prefer objects not obstructed by terrain
 		}
 	}
@@ -811,6 +822,7 @@ int aiBestNearestTarget(DROID *psDroid, BASE_OBJECT **ppsObj, int weapon_slot, i
 		// Ignore friendly walls here
 		if (proj_Direct(psWStats)
 			&& targetStructure
+			&& !(targetModeOf(psDroid) == TargetMode::Smart && targetModeSmartWallShots())
 			&& !aiCheckAlliances(psDroid->player, targetStructure->player))
 		{
 			//are we any good against walls?
