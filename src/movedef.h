@@ -107,6 +107,12 @@ struct MOVE_CONTROL
 	uint8_t shuffleHomeTries = 0;         ///< How many times it has been sent back
 	bool returningHome = false;           ///< On its way back to shuffleHome
 
+	/// Which way round obstacles the droid has been steering, as the side of its target direction (-1 left, +1 right,
+	/// 0 for none yet), so that it keeps to one side instead of flipping every time the obstacles shift a little.
+	/// Not saved: a droid with no side picks one afresh.
+	int8_t avoidSide = 0;
+	unsigned avoidSideLastUsed = 0;       ///< When the side was last used, the choice is forgotten after a pause
+
 	/// A formation's speed limit, as the slowest member's base speed, for the move the formation order started.
 	/// Not synchronised, so only safe where every client sees the same orders... see formationorder.cpp.
 	unsigned formationSpeedCap = 0;       ///< 0 for no limit

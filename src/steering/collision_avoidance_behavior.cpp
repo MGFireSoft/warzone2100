@@ -47,6 +47,9 @@
 namespace steering
 {
 
+// How long a side stays chosen without any avoidance, so that a droid in the clear starts fresh
+static constexpr unsigned AVOID_SIDE_HOLD_TIME = 1500;
+
 SteeringForce CollisionAvoidanceBehavior::calculate(const SteeringContext& ctx)
 {
 	WZ_PERF_SCOPE(T_steeringScan);
@@ -144,6 +147,35 @@ SteeringForce CollisionAvoidanceBehavior::calculate(const SteeringContext& ctx)
 	// Create perpendicular avoid vector (choose side toward target)
 	Vector2i perp = orthogonalCW(totalDir);
 	Vector2i avoid = dot(toTarget, perp) < 0 ? -perp : perp;
+
+	// Once a side has been picked, keep to it. Choosing afresh every tick flips the side whenever the obstacles
+	// shift a little, and a droid among a crowd of idle neighbours then turns left and right without getting anywhere.
+	// The side is only given up when keeping it would point well away from the target.
+	if (ctx.moveControl != nullptr)
+	{
+		MOVE_CONTROL &m = *ctx.moveControl;
+		const auto sideOf = [&](const Vector2i &v) {
+			return (static_cast<int64_t>(toTarget.x) * v.y - static_cast<int64_t>(toTarget.y) * v.x) < 0 ? -1 : 1;
+		};
+		const bool remembered = m.avoidSide != 0 && gameTime <= m.avoidSideLastUsed + AVOID_SIDE_HOLD_TIME
+		                        && sideOf(perp) != sideOf(-perp);
+		if (remembered)
+		{
+			const Vector2i kept = sideOf(perp) == m.avoidSide ? perp : -perp;
+			// cos of the angle to the target below -0.5 means keeping the side turns it more than 120 degrees away
+			const int64_t d = dot(toTarget, kept);
+			const int64_t lens = static_cast<int64_t>(iHypot(toTarget)) * iHypot(kept);
+			if (d * 2 >= -lens)
+			{
+				avoid = kept;
+			}
+		}
+		if (sideOf(perp) != sideOf(-perp))
+		{
+			m.avoidSide = static_cast<int8_t>(sideOf(avoid));
+			m.avoidSideLastUsed = gameTime;
+		}
+	}
 
 	// Normalize both destination and avoid vectors
 	Vector2i destNorm = toTarget * 32767 / (iHypot(toTarget) + 1);

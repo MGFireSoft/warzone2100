@@ -1694,6 +1694,7 @@ static uint16_t moveGetDirection(DROID *psDroid)
 	ctx.speed = psDroid->sMove.speed;
 	ctx.maxSpeed = psDroid->getPropulsionStats()->maxSpeed;
 	ctx.radius = moveObjRadius(psDroid);
+	ctx.moveControl = &psDroid->sMove;
 
 	// Calculate steering direction
 	return moveSteeringManager().calculateSteeringDirection(ctx);

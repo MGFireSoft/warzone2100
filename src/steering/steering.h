@@ -34,6 +34,7 @@
 #include <vector>
 
 struct DROID;
+struct MOVE_CONTROL;
 
 namespace steering
 {
@@ -83,6 +84,8 @@ struct SteeringContext
 	int32_t maxSpeed = 0;
 	// Droid collision radius
 	int32_t radius = 0;
+	// The droid's own movement state, for behaviors that need to remember something between ticks. May be null.
+	MOVE_CONTROL* moveControl = nullptr;
 };
 
 /// <summary>
