@@ -19,8 +19,8 @@ Los cambios propios se desarrollan en la rama `mi-mod`.
 - **Las unidades que se corren vuelven a su lugar** una vez que pasa la que las empujo (`moveReturnHome` en `src/move.cpp`).
 - **Evitacion de obstaculos**: el tanque mantiene el lado elegido para esquivar en vez de cambiarlo en cada tick (`collision_avoidance_behavior.cpp`).
 - **Modos de objetivo, solo para pruebas** (`src/targetweights.*`, `src/targetmode.*`, `src/targetsmart.cpp`): por defecto, por tipo,
-  inteligente, mas cercano, concentracion, concentracion por amenaza y orden de eliminacion (peligro / tiempo para matarlo). Ya no se eligen en el juego (se quito el selector Ctrl+F6/F7):
-  se activan con la variable de entorno `WZ_TARGETMODE` (0 a 6) para los escenarios de prueba. En el juego, todas las unidades usan el criterio normal.
+  inteligente, mas cercano, concentracion, concentracion por amenaza orden de eliminacion (peligro / tiempo para matarlo) y amenaza por unidad. Ya no se eligen en el juego (se quito el selector Ctrl+F6/F7):
+  se activan con la variable de entorno `WZ_TARGETMODE` (0 a 7) para los escenarios de prueba. En el juego, todas las unidades usan el criterio normal.
 - **Modo de objetivo inteligente por tipo de arma** (`src/targetweights.cpp`, `src/targetsmart.cpp`): cada arma tiene su orden de prioridad
   (artilleria contra artilleria, anti-tanque guarda sus tiros para tanques, bunker buster a estructuras, etc.). Prueba: `--movementbench=assault`.
 - **Medicion de si algo pasa por encima del modo de objetivo** (`tests/movebench/target_agreement.py`): en modo inteligente el 72 % de los disparos
@@ -32,3 +32,6 @@ Los cambios propios se desarrollan en la rama `mi-mod`.
   por amenaza lo empata (118,5 s contra 116,5 s, misma vida restante) y mata los bunkers antes, pero tarda mas con la torre Tank Killer.
 - **Orden de eliminacion** (10 combates por modo en `precision`): empata con el criterio normal (+4,9 s y +142 de dano recibido, ambos dentro del
   margen de error); concentrar a todo el grupo en un solo blanco pierde la especializacion de cada arma, que el criterio normal si aprovecha.
+- **Amenaza por unidad** (modo 7): el peso normal del juego mas peligro x dano por segundo de la unidad contra el blanco / vida restante.
+  En 10 combates de `precision`: 15 % menos de dano recibido que el criterio normal (2.208 contra 2.601, diferencia emparejada -394 +/- 271),
+  sin los combates desastrosos del criterio normal, y el mismo tiempo. Prometedor pero todavia no concluyente.

@@ -227,6 +227,7 @@ int targetModeWeight(TargetMode mode, const TargetTerms &t)
 		return 1000 + t.distance;
 	case TargetMode::ThreatFocus:
 	case TargetMode::KillOrder:
+	case TargetMode::UnitThreat:
 		// the game's own weighting, with a bonus for the shared target on top, see targetModeFocusBonus()
 	case TargetMode::Default:
 	case TargetMode::Count:
@@ -246,6 +247,7 @@ const char *targetModeName(TargetMode mode)
 	case TargetMode::Focus: return "focus (everyone on one target, then the nearest next one)";
 	case TargetMode::ThreatFocus: return "threat focus (everyone on the most dangerous target, then the next)";
 	case TargetMode::KillOrder: return "kill order (everyone on the target that saves the most damage per second spent on it)";
+	case TargetMode::UnitThreat: return "unit threat (the game's choice, plus the damage each unit stops by firing at a target)";
 	case TargetMode::Count: break;
 	}
 	return "";

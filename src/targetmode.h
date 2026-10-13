@@ -65,6 +65,12 @@ void targetModeLogHit(const SIMPLE_OBJECT *shooter, unsigned player, const WEAPO
 /// The focus modes: a large bonus when the target is the one the attacker's side is concentrating on, 0 otherwise.
 int targetModeFocusBonus(const DROID *attacker, const BASE_OBJECT *target);
 
+/// The unit threat mode: what is added to the game's own weight of a target for one attacker. It is the target's danger
+/// (damage per second it does to the attacker's side) times the damage per second this attacker's weapon does to it,
+/// over the hitpoints it has left: how fast this unit's fire takes that danger off the field. Summed over a side, it is
+/// the target's danger over the time the side takes to kill it, so each unit picks where its own weapon helps that most.
+int targetModeUnitThreatBonus(const DROID *attacker, const WEAPON_STATS *weapon, const BASE_OBJECT *target);
+
 /// Whether a droid should keep the target it has instead of looking for a better one: in the nearest mode always, in the
 /// focus modes while that target is the one its side is concentrating on.
 bool targetModeKeepsTarget(const DROID *attacker, const BASE_OBJECT *current);

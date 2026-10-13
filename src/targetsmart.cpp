@@ -40,6 +40,8 @@
 #include "combat.h"
 
 #include <cstdlib>
+#include <map>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -1036,4 +1038,71 @@ bool targetModeKeepsTarget(const DROID *attacker, const BASE_OBJECT *current)
 	default:
 		return false;
 	}
+}
+
+namespace
+{
+
+/// How much the unit threat figure weighs against the game's own weight, which is a few hundred points.
+const double UNIT_THREAT_SCALE = 5000.0;
+
+/// A target's danger to a side, worked out once per tick per target and side.
+struct DangerMemo
+{
+	unsigned time = 0;
+	double danger = 0;
+};
+
+std::map<std::pair<unsigned, unsigned>, DangerMemo> dangerMemos;
+std::set<unsigned> dangerLogged;
+
+/// Damage per second `target` does to `player`'s droids, averaged over them.
+double dangerTo(unsigned player, const BASE_OBJECT *target)
+{
+	DangerMemo &memo = dangerMemos[{player, target->id}];
+	if (memo.time == gameTime && gameTime != 0)
+	{
+		return memo.danger;
+	}
+	double danger = 0;
+	unsigned count = 0;
+	for (const DROID *psDroid : gameWorld.objects.droids[player])
+	{
+		if (psDroid->died)
+		{
+			continue;
+		}
+		count++;
+		for (int i = 0; i < weaponCount(target); i++)
+		{
+			danger += damagePerSecond(weaponOf(target, i), target->player, psDroid);
+		}
+	}
+	memo.time = gameTime;
+	memo.danger = count != 0 ? danger / count : 0;
+	if (fireLogEnabled() && dangerLogged.insert(target->id).second)
+	{
+		debug(LOG_INFO, "DANGER t=%u p=%u tgt=%u danger=%.2f hp=%u", gameTime, player, target->id, memo.danger, target->body);
+	}
+	return memo.danger;
+}
+
+}
+
+int targetModeUnitThreatBonus(const DROID *attacker, const WEAPON_STATS *weapon, const BASE_OBJECT *target)
+{
+	if (attacker == nullptr || weapon == nullptr || target == nullptr || target->died)
+	{
+		return 0;
+	}
+	const double danger = dangerTo(attacker->player, target);
+	if (danger <= 0)
+	{
+		return 0;
+	}
+	const double myDps = damagePerSecond(weapon, attacker->player, target);
+	const unsigned incoming = incomingDamage(target);
+	const double hitpoints = target->body > incoming ? static_cast<double>(target->body - incoming) : 1.0;
+	const double bonus = danger * myDps / hitpoints * UNIT_THREAT_SCALE;
+	return bonus < 1e9 ? static_cast<int>(bonus) : 1000000000;
 }

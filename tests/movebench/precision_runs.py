@@ -5,7 +5,9 @@ import collections, csv, json, os, re, statistics, subprocess
 
 EXE = r"F:\wz-build\src\warzone2100.exe"
 OUT = r"F:\wz-precision"
-MODES = ["default", "by type", "smart", "nearest", "focus", "threat focus", "kill order"]
+# the modes compared, by name, with the WZ_TARGETMODE number of each
+MODE_NUMBERS = {"default": 0, "by type": 1, "smart": 2, "nearest": 3, "focus": 4, "threat focus": 5, "kill order": 6, "unit threat": 7}
+MODES = ["default", "unit threat"]
 # ten different starts: five spawn arrangements, each with two random seeds
 RUNS = [(arr, seed) for seed in (None, 111) for arr in range(5)]
 
@@ -15,6 +17,7 @@ fire_re = re.compile(r"FIRE t=(\d+) p=(\d+) src=(\d+) w=(\S+) tgt=(\d+) aim=(\d+
 lost_re = re.compile(r"LOST t=(\d+) p=(\d+) src=(\d+) w=(\S+)")
 hit_re = re.compile(r"HIT t=(\d+) p=(\d+) src=(\d+) w=(\S+) tgt=(\d+) tp=(\d+) dmg=(\d+) left=(\d+) killed=(\d)")
 state_re = re.compile(r"STATE t=(\d+) (.*)$")
+danger_re = re.compile(r"DANGER t=(\d+) p=0 tgt=(\d+) danger=([\d.]+) hp=(\d+)")
 focus_re = re.compile(r"FOCUS t=(\d+) p=0 tgt=(\d+) threat=(-?\d+)(?: danger=([\d.]+) ttk=([\d.]+))?")
 
 WEAPON_NAMES = {
@@ -31,7 +34,8 @@ def weapon_name(w):
 
 os.makedirs(OUT, exist_ok=True)
 runs = []
-for mode_index, mode in enumerate(MODES):
+for mode in MODES:
+    mode_index = MODE_NUMBERS[mode]
     for run, (arr, seed) in enumerate(RUNS):
         env = dict(os.environ, WZ_TARGETMODE=str(mode_index), WZ_FIRELOG="1")
         cmd = [EXE, "--movementbench=precision", f"--movementarrangement={arr}"] + ([f"--movementseed={seed}"] if seed else [])
@@ -43,7 +47,12 @@ for mode_index, mode in enumerate(MODES):
         battles = []
         last_state = None
         focus = []
+        danger = {}
         for line in out.splitlines():
+            m = danger_re.search(line)
+            if m:
+                danger[int(m.group(2))] = (float(m.group(3)), int(m.group(4)))
+                continue
             m = focus_re.search(line)
             if m:
                 focus.append((int(m.group(1)), int(m.group(2)), int(m.group(3)), m.group(4), m.group(5)))
@@ -95,7 +104,7 @@ for mode_index, mode in enumerate(MODES):
         deaths = {e["target"]: (e["t"], e["shooter"], e["weapon"]) for e in events if e["event"] == "kill"}
         runs.append({"mode": mode, "run": run, "units": units, "events": events, "t_done": t_done, "t_units": t_units,
                      "attackers_left": end[1] if end else None, "attacker_health": end[2] if end else None, "deaths": deaths,
-                     "last_state": last_state, "focus": focus})
+                     "last_state": last_state, "focus": focus, "danger": danger})
     print("done", mode, flush=True)
 
 
@@ -189,6 +198,12 @@ for label in labels:
     p(f"| {label} | " + " | ".join(cells) + " |")
 
 for x in runs:
+    if x["mode"] == "unit threat" and x["run"] == 0 and x["danger"]:
+        p("\n## Danger of each defender as the unit threat mode reckons it (first run, when first seen)\n")
+        p("| defender | danger (damage per second to the attackers) | hitpoints |")
+        p("|---|---|---|")
+        for tgt, (d, hp) in sorted(x["danger"].items(), key=lambda kv: -kv[1][0]):
+            p(f"| {x['units'].get(tgt, {}).get('label', tgt)} | {d:.2f} | {hp} |")
     if x["mode"] == "threat focus" and x["run"] == 0 and x["focus"]:
         p("\n## Order in which the threat focus mode turned on the defence (first run)\n")
         p("| time | target | threat (damage per minute against the attackers) |")
