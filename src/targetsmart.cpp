@@ -1273,3 +1273,153 @@ int targetModeUnitThreatBonus(const DROID *attacker, const WEAPON_STATS *weapon,
 	const double bonus = danger * myDps / hitpoints * UNIT_THREAT_SCALE;
 	return tier + (bonus < 1e8 ? static_cast<int>(bonus) : 100000000);
 }
+
+namespace
+{
+
+/// The enemy artillery each enemy sensor can guide, worked out once per tick for each side: for every sensor, the summed
+/// danger of the artillery whose reach covers the sensor's position, and the same with each artillery piece's danger
+/// divided between all the sensors it could be guided by.
+struct SensorValues
+{
+	unsigned time = 0;
+	bool known = false;
+	std::map<unsigned, double> full;     ///< by sensor id
+	std::map<unsigned, double> shared;   ///< by sensor id
+};
+
+SensorValues sensorValues[MAX_PLAYER_SLOTS];
+
+const SensorValues &sensorValuesFor(unsigned player)
+{
+	SensorValues &v = sensorValues[player];
+	if (v.known && v.time == gameTime)
+	{
+		return v;
+	}
+	v.known = true;
+	v.time = gameTime;
+	v.full.clear();
+	v.shared.clear();
+
+	struct Piece
+	{
+		Vector2i pos;
+		int64_t range;
+		double danger;
+		std::vector<unsigned> sensors;
+	};
+	std::vector<Piece> artillery;
+	std::vector<const BASE_OBJECT *> sensors;
+	const auto look = [&](const BASE_OBJECT *psObj) {
+		if (psObj->died)
+		{
+			return;
+		}
+		if (isSensor(psObj))
+		{
+			sensors.push_back(psObj);
+			return;
+		}
+		if (!isArtillery(psObj))
+		{
+			return;
+		}
+		bool firedLately = false;
+		int64_t range = 0;
+		for (int i = 0; i < weaponCount(psObj); i++)
+		{
+			const unsigned lastFired = psObj->asWeaps[i].lastFired;
+			firedLately = firedLately || (lastFired != 0 && gameTime - lastFired < ARTILLERY_FIRING_TIME);
+			const WEAPON_STATS *weapon = weaponOf(psObj, i);
+			if (weapon != nullptr)
+			{
+				range = std::max<int64_t>(range, proj_GetLongRange(*weapon, static_cast<int>(psObj->player)));
+			}
+		}
+		// artillery counts once it has been seen, or once it has been shelling the side
+		if (psObj->visible[player] == UBYTE_MAX || firedLately)
+		{
+			artillery.push_back({psObj->pos.xy(), range, dangerTo(player, psObj), {}});
+		}
+	};
+	for (unsigned p = 0; p < MAX_PLAYERS; p++)
+	{
+		if (!enemies(p, player))
+		{
+			continue;
+		}
+		for (const DROID *psDroid : gameWorld.objects.droids[p])
+		{
+			look(psDroid);
+		}
+		for (const STRUCTURE *psStructure : gameWorld.objects.structures[p])
+		{
+			look(psStructure);
+		}
+	}
+	for (Piece &piece : artillery)
+	{
+		for (const BASE_OBJECT *sensor : sensors)
+		{
+			const int64_t dx = sensor->pos.x - piece.pos.x;
+			const int64_t dy = sensor->pos.y - piece.pos.y;
+			if (dx * dx + dy * dy <= piece.range * piece.range)
+			{
+				piece.sensors.push_back(sensor->id);
+			}
+		}
+		for (unsigned id : piece.sensors)
+		{
+			v.full[id] += piece.danger;
+			v.shared[id] += piece.danger / static_cast<double>(piece.sensors.size());
+		}
+	}
+	if (fireLogEnabled())
+	{
+		for (const BASE_OBJECT *sensor : sensors)
+		{
+			if (dangerLogged.insert(sensor->id).second)
+			{
+				debug(LOG_INFO, "DANGER t=%u p=%u tgt=%u danger=%.2f hp=%u", gameTime, player, sensor->id,
+				      v.full.count(sensor->id) ? v.full.at(sensor->id) : 0.0, sensor->body);
+			}
+		}
+	}
+	return v;
+}
+
+}
+
+int targetModeSensorBonus(const DROID *attacker, const WEAPON_STATS *weapon, const BASE_OBJECT *target)
+{
+	if (attacker == nullptr || target == nullptr || target->died)
+	{
+		return 0;
+	}
+	const bool spotter = attacker->droidType == DROID_SENSOR;
+	const bool artilleryUnit = spotter || (weapon != nullptr && !proj_Direct(weapon));
+	const bool targetIsSensor = isSensor(target);
+
+	// the artillery and the sensor droids that guide it: sensors first, then artillery, then the game's own choice
+	if (artilleryUnit)
+	{
+		return targetIsSensor ? TOP_PRIORITY : (isArtillery(target) ? SECOND_PRIORITY : 0);
+	}
+	if (!targetIsSensor)
+	{
+		return 0;
+	}
+	const SensorValues &values = sensorValuesFor(attacker->player);
+	const std::map<unsigned, double> &table = targetModeOf(attacker) == TargetMode::SmartSensorsShared ? values.shared : values.full;
+	const auto found = table.find(target->id);
+	if (found == table.end() || found->second <= 0)
+	{
+		return 0;
+	}
+	const double myDps = damagePerSecond(weapon, attacker->player, target);
+	const unsigned incoming = incomingDamage(target);
+	const double hitpoints = target->body > incoming ? static_cast<double>(target->body - incoming) : 1.0;
+	const double bonus = found->second * myDps / hitpoints * UNIT_THREAT_SCALE;
+	return bonus < 1e8 ? static_cast<int>(bonus) : 100000000;
+}

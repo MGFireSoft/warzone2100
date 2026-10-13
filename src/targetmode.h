@@ -71,6 +71,15 @@ int targetModeFocusBonus(const DROID *attacker, const BASE_OBJECT *target);
 /// the target's danger over the time the side takes to kill it, so each unit picks where its own weapon helps that most.
 int targetModeUnitThreatBonus(const DROID *attacker, const WEAPON_STATS *weapon, const BASE_OBJECT *target);
 
+/// The smart v3 modes: what is added to the game's own weight of a target for one attacker.
+/// - For an attacker that fires indirectly, or a sensor droid spotting for one: a large bonus for an enemy sensor, and a
+///   smaller one for enemy artillery, so that those go first, in that order; anything else keeps the game's own weight.
+/// - For any other attacker: nothing, except for an enemy sensor, which is worth the damage per second of the enemy
+///   artillery that can guide on it (artillery whose reach covers where the sensor stands), times the damage per second
+///   this attacker does to it, over the hitpoints it has left. In the shared variant, each artillery piece's danger is
+///   divided between all the sensors that can guide it.
+int targetModeSensorBonus(const DROID *attacker, const WEAPON_STATS *weapon, const BASE_OBJECT *target);
+
 /// Whether a droid should keep the target it has instead of looking for a better one: in the nearest mode always, in the
 /// focus modes while that target is the one its side is concentrating on.
 bool targetModeKeepsTarget(const DROID *attacker, const BASE_OBJECT *current);

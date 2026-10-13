@@ -469,6 +469,10 @@ static SDWORD targetAttackWeightIfGreaterThan(SDWORD currentBest, BASE_OBJECT *p
 				{
 					attackWeight += targetModeUnitThreatBonus(psAttackerDroid, attackerWeapon, psTarget);
 				}
+				else if (targetMode == TargetMode::SmartSensors || targetMode == TargetMode::SmartSensorsShared)
+				{
+					attackWeight += targetModeSensorBonus(psAttackerDroid, attackerWeapon, psTarget);
+				}
 			}
 		}
 
@@ -543,6 +547,10 @@ static SDWORD targetAttackWeightIfGreaterThan(SDWORD currentBest, BASE_OBJECT *p
 				         || targetMode == TargetMode::UnitThreatArtillery)
 				{
 					attackWeight += targetModeUnitThreatBonus(psAttackerDroid, attackerWeapon, psTarget);
+				}
+				else if (targetMode == TargetMode::SmartSensors || targetMode == TargetMode::SmartSensorsShared)
+				{
+					attackWeight += targetModeSensorBonus(psAttackerDroid, attackerWeapon, psTarget);
 				}
 			}
 		}
