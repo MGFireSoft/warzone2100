@@ -45,7 +45,7 @@ enum class TargetMode
 	UnitThreatArtillery,  ///< smart v2, with the artillery going for enemy artillery first
 	SmartSensors,         ///< "smart v3": the game's own weighting, with each enemy sensor as dangerous as all the artillery it can guide
 	SmartSensorsShared,   ///< smart v3, with each artillery piece's danger shared out between the sensors that can guide it
-	SmartV4,              ///< "smart v4": smart v2 for every unit, and the artillery going for enemy sensors first, then enemy artillery
+	SmartV4,              ///< "smart v4", in the game as "smart artillery": smart v2 for every unit, and the artillery going for enemy sensors first, then enemy artillery
 	Count,
 };
 

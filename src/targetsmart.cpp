@@ -1244,8 +1244,10 @@ int targetModeUnitThreatBonus(const DROID *attacker, const WEAPON_STATS *weapon,
 	const bool targetIsSensor = isSensor(target);
 	const bool targetIsArtillery = isArtillery(target);
 
-	// the artillery's own order of priority in the variants; v4 takes it from the sensors variant, and leaves every other
-	// unit on plain v2, so that assault units do not go after sensors
+	// The artillery's own order of priority in the variants. Smart v4, which the game offers as "smart artillery", takes
+	// it from the sensors variant and leaves every other unit on plain v2, so that assault units do not go after sensors.
+	// In the precision2 benchmark that took a third less damage than the game's own choice, mostly because the enemy's
+	// artillery goes blind once its sensors fall; see doc/ArtilleriaInteligente.md.
 	int tier = 0;
 	if (artilleryUnit && (mode == TargetMode::UnitThreatSensors || mode == TargetMode::SmartV4))
 	{

@@ -45,3 +45,10 @@ Los cambios propios se desarrollan en la rama `mi-mod`.
 - **Inteligente v4** (modo 12): v2 para todas las unidades, y solo la artilleria propia (y el tanque sensor) prioriza sensores enemigos y
   luego artilleria enemiga. En `precision2`, 5 combates: -1.442 +/- 453 de dano recibido contra el criterio normal (2.914 contra 4.356),
   practicamente igual que v2 sensores en las mismas condiciones (2.734), sin que las unidades de asalto persigan sensores.
+
+## Artilleria inteligente (Ctrl+F8)
+
+Modo de seleccion de objetivos que salio de todas las pruebas anteriores (es el "inteligente v4"). Se activa y desactiva
+con **Ctrl+F8** en partidas sin red. Las unidades eligen como siempre, mas cuanto dano evitan por segundo de fuego, y la
+artilleria propia y los tanques sensor van primero contra los sensores enemigos y luego contra la artilleria enemiga.
+Detalles, limitaciones y el resumen de las pruebas: [doc/ArtilleriaInteligente.md](doc/ArtilleriaInteligente.md).

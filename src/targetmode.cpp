@@ -20,10 +20,15 @@
 */
 
 #include "lib/framework/frame.h"
+#include "lib/netplay/netplay.h"
 #include "targetmode.h"
 #include "objects.h"
+#include "console.h"
 
 #include <cstdlib>
+
+/// Whether the local player's units use the smart artillery mode. Off until switched on, and never in a network game.
+static bool smartArtilleryOn = false;
 
 /// For benchmarks: WZ_TARGETMODE=<number> gives every droid of the local player that mode. Without it, every droid
 /// chooses its targets the game's usual way.
@@ -43,5 +48,27 @@ TargetMode targetModeOf(const DROID *psDroid)
 	{
 		return static_cast<TargetMode>(override);
 	}
+	// The switch is local to this client and target choice is part of the simulation, so in a network game it would
+	// make this client's game drift apart from everyone else's. It only applies where this client is the only one.
+	if (smartArtilleryOn && !NetPlay.bComms && psDroid->player == selectedPlayer)
+	{
+		return TargetMode::SmartV4;
+	}
 	return TargetMode::Default;
+}
+
+bool targetModeSmartArtilleryOn()
+{
+	return smartArtilleryOn && !NetPlay.bComms;
+}
+
+void kf_ToggleSmartArtillery()
+{
+	if (NetPlay.bComms)
+	{
+		addConsoleMessage(_("Smart artillery is not available in network games"), DEFAULT_JUSTIFY, INFO_MESSAGE);
+		return;
+	}
+	smartArtilleryOn = !smartArtilleryOn;
+	addConsoleMessage(smartArtilleryOn ? _("Smart artillery: ON") : _("Smart artillery: OFF"), DEFAULT_JUSTIFY, INFO_MESSAGE);
 }

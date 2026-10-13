@@ -19,11 +19,16 @@
 	Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 */
 /** \file
- *  Target modes, for experiments.
+ *  Target modes.
  *
- *  A mode changes how the local player's droids pick targets (see targetweights.h). There is no way to choose one in
- *  the game: the WZ_TARGETMODE environment variable sets it for the movement benchmarks, which compare the modes, and
- *  without it every droid picks its targets the game's usual way.
+ *  A mode changes how the local player's droids pick targets (see targetweights.h). Most of them only exist for the
+ *  movement benchmarks that compare them, chosen with the WZ_TARGETMODE environment variable. One came out of those
+ *  comparisons clearly ahead and is available in the game as "smart artillery" (TargetMode::SmartV4), switched on and
+ *  off with a hotkey: every unit keeps the game's own choice plus a measure of how much damage it stops by firing at a
+ *  target, and the artillery and the sensor droids that spot for it go for enemy sensors first and enemy artillery
+ *  second, which blinds the enemy's artillery early. doc/ArtilleriaInteligente.md tells how it was arrived at.
+ *
+ *  Without the switch or the variable, every droid picks its targets the game's usual way.
  */
 
 #pragma once
@@ -87,6 +92,13 @@ bool targetModeKeepsTarget(const DROID *attacker, const BASE_OBJECT *current);
 /// Whether the smart mode refuses to shoot through an enemy wall, looking for another target instead.
 bool targetModeSmartWallShots();
 
-/// The mode that applies to a droid: the one set by WZ_TARGETMODE for the local player's droids, the game's own
-/// weighting otherwise.
+/// The mode that applies to a droid: the one set by WZ_TARGETMODE for the local player's droids, smart artillery for
+/// them while it is switched on, the game's own weighting otherwise.
 TargetMode targetModeOf(const DROID *psDroid);
+
+/// Whether smart artillery is on for the local player. It is never on in a network game, where a setting only this
+/// client knows about would put its simulation out of step with the other players'.
+bool targetModeSmartArtilleryOn();
+
+/// Hotkey handler: switches smart artillery on or off.
+void kf_ToggleSmartArtillery();
