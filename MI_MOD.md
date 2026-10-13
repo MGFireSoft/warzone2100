@@ -19,8 +19,8 @@ Los cambios propios se desarrollan en la rama `mi-mod`.
 - **Las unidades que se corren vuelven a su lugar** una vez que pasa la que las empujo (`moveReturnHome` en `src/move.cpp`).
 - **Evitacion de obstaculos**: el tanque mantiene el lado elegido para esquivar en vez de cambiarlo en cada tick (`collision_avoidance_behavior.cpp`).
 - **Modos de objetivo, solo para pruebas** (`src/targetweights.*`, `src/targetmode.*`, `src/targetsmart.cpp`): por defecto, por tipo,
-  inteligente, mas cercano, concentracion y concentracion por amenaza. Ya no se eligen en el juego (se quito el selector Ctrl+F6/F7):
-  se activan con la variable de entorno `WZ_TARGETMODE` (0 a 5) para los escenarios de prueba. En el juego, todas las unidades usan el criterio normal.
+  inteligente, mas cercano, concentracion, concentracion por amenaza y orden de eliminacion (peligro / tiempo para matarlo). Ya no se eligen en el juego (se quito el selector Ctrl+F6/F7):
+  se activan con la variable de entorno `WZ_TARGETMODE` (0 a 6) para los escenarios de prueba. En el juego, todas las unidades usan el criterio normal.
 - **Modo de objetivo inteligente por tipo de arma** (`src/targetweights.cpp`, `src/targetsmart.cpp`): cada arma tiene su orden de prioridad
   (artilleria contra artilleria, anti-tanque guarda sus tiros para tanques, bunker buster a estructuras, etc.). Prueba: `--movementbench=assault`.
 - **Medicion de si algo pasa por encima del modo de objetivo** (`tests/movebench/target_agreement.py`): en modo inteligente el 72 % de los disparos
@@ -30,3 +30,5 @@ Los cambios propios se desarrollan en la rama `mi-mod`.
   y `tests/movebench/precision_runs.py`, que guarda cada disparo e impacto en `F:\wz-precision`.
 - **Conclusion de las pruebas de objetivos**: ningun modo supera al criterio normal del juego en el escenario `precision`; la concentracion
   por amenaza lo empata (118,5 s contra 116,5 s, misma vida restante) y mata los bunkers antes, pero tarda mas con la torre Tank Killer.
+- **Orden de eliminacion** (10 combates por modo en `precision`): empata con el criterio normal (+4,9 s y +142 de dano recibido, ambos dentro del
+  margen de error); concentrar a todo el grupo en un solo blanco pierde la especializacion de cada arma, que el criterio normal si aprovecha.

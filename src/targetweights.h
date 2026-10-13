@@ -39,6 +39,7 @@ enum class TargetMode
 	Nearest,     ///< the first thing within reach, kept until it is destroyed
 	Focus,       ///< the whole side fires at one target until it is destroyed, then at the nearest next one
 	ThreatFocus, ///< the whole side fires at the most dangerous target it can reach, then the next most dangerous
+	KillOrder,   ///< the whole side fires at the target whose death saves it the most damage for each second spent on it
 	Count,
 };
 

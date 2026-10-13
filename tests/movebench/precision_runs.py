@@ -1,12 +1,13 @@
-# Runs the `precision` movement bench scenario five times under each target mode, keeps every shot and every hit,
+# Runs the `precision` movement bench scenario ten times under each target mode, keeps every shot and every hit,
 # and writes a summary. The raw events of each run go to precision_<mode>_<run>.csv next to the summary.
 # Paths are those of this machine.
 import collections, csv, json, os, re, statistics, subprocess
 
 EXE = r"F:\wz-build\src\warzone2100.exe"
 OUT = r"F:\wz-precision"
-MODES = ["default", "by type", "smart", "nearest", "focus", "threat focus"]
-RUNS = range(5)
+MODES = ["default", "by type", "smart", "nearest", "focus", "threat focus", "kill order"]
+# ten different starts: five spawn arrangements, each with two random seeds
+RUNS = [(arr, seed) for seed in (None, 111) for arr in range(5)]
 
 unit_re = re.compile(r"UNIT id=(\d+) side=(\w+) kind=(\w+) label=(.+?)\s*$")
 battle_re = re.compile(r"BATTLE t=(\d+) attacker=(\d+) health=(\d+) defender=(\d+) health=(\d+) structures=(\d+) health=(\d+)")
@@ -14,7 +15,7 @@ fire_re = re.compile(r"FIRE t=(\d+) p=(\d+) src=(\d+) w=(\S+) tgt=(\d+) aim=(\d+
 lost_re = re.compile(r"LOST t=(\d+) p=(\d+) src=(\d+) w=(\S+)")
 hit_re = re.compile(r"HIT t=(\d+) p=(\d+) src=(\d+) w=(\S+) tgt=(\d+) tp=(\d+) dmg=(\d+) left=(\d+) killed=(\d)")
 state_re = re.compile(r"STATE t=(\d+) (.*)$")
-focus_re = re.compile(r"FOCUS t=(\d+) p=0 tgt=(\d+) threat=(-?\d+)")
+focus_re = re.compile(r"FOCUS t=(\d+) p=0 tgt=(\d+) threat=(-?\d+)(?: danger=([\d.]+) ttk=([\d.]+))?")
 
 WEAPON_NAMES = {
     "MG4ROTARYMk1": "Assault Gun", "Rocket-BB": "Bunker Buster", "Rocket-HvyA-T": "Tank Killer", "Mortar2Mk1": "Bombard",
@@ -31,9 +32,10 @@ def weapon_name(w):
 os.makedirs(OUT, exist_ok=True)
 runs = []
 for mode_index, mode in enumerate(MODES):
-    for run in RUNS:
+    for run, (arr, seed) in enumerate(RUNS):
         env = dict(os.environ, WZ_TARGETMODE=str(mode_index), WZ_FIRELOG="1")
-        out = subprocess.run([EXE, "--movementbench=precision", f"--movementarrangement={run}"], env=env,
+        cmd = [EXE, "--movementbench=precision", f"--movementarrangement={arr}"] + ([f"--movementseed={seed}"] if seed else [])
+        out = subprocess.run(cmd, env=env,
                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors="replace",
                              cwd=r"F:\wz-build\src", timeout=900).stdout
         units = {}
@@ -44,7 +46,7 @@ for mode_index, mode in enumerate(MODES):
         for line in out.splitlines():
             m = focus_re.search(line)
             if m:
-                focus.append((int(m.group(1)), int(m.group(2)), int(m.group(3))))
+                focus.append((int(m.group(1)), int(m.group(2)), int(m.group(3)), m.group(4), m.group(5)))
                 continue
             m = unit_re.search(line)
             if m:
@@ -104,7 +106,7 @@ def mean(xs):
 
 lines = []
 p = lines.append
-p("# Precision scenario: five runs per target mode\n")
+p(f"# Precision scenario: {len(RUNS)} runs per target mode\n")
 p("Attacker: 12 Python tracked tanks (3 Assault Gun, 3 Bunker Buster, 3 Tank Killer, 3 Bombard), target mode under test.")
 p("Defender, always default: Assault Gun Hardpoint, Tank Killer Hardpoint, Hardened Sensor Tower, 2 Twin Assault Cannon Bunkers, "
   "2 Super Heavy-Gunner and 2 Super Auto-Cannon Cyborgs, 3 Machinegun Python tanks, 2 Mortar Pits.\n")
@@ -138,7 +140,7 @@ for mode in MODES:
 p("")
 p("Fire on one target: in each second, the share of the attackers' shots that went at that second's most shot-at target.")
 
-p("\n## What each attacker weapon fired at (all five runs together)\n")
+p("\n## What each attacker weapon fired at (all runs together)\n")
 for mode in MODES:
     r = [x for x in runs if x["mode"] == mode]
     p(f"### {mode}\n")
@@ -164,7 +166,7 @@ for mode in MODES:
         p(f"| {weapon_name(w)} | {n_fired} | {100*n_lost/max(n_fired,1):.0f}% | {n_hits} | {dmg} | {kills} | {share} |")
     p("")
 
-p("## When each defender fell, and to what (average over the runs it fell in)\n")
+p("## When each defender fell, and to what (average over the runs it fell in; the counts are kills over all runs)\n")
 p("| defender | " + " | ".join(MODES) + " |")
 p("|---|" + "---|" * len(MODES))
 labels = []
@@ -191,10 +193,16 @@ for x in runs:
         p("\n## Order in which the threat focus mode turned on the defence (first run)\n")
         p("| time | target | threat (damage per minute against the attackers) |")
         p("|---|---|---|")
-        for t, tgt, threat in x["focus"]:
+        for t, tgt, threat, danger, ttk in x["focus"]:
             p(f"| {t/1000:.1f} s | {x['units'].get(tgt, {}).get('label', tgt)} | {threat} |")
+    if x["mode"] == "kill order" and x["run"] == 0 and x["focus"]:
+        p("\n## Order in which the kill order mode turned on the defence (first run)\n")
+        p("| time | target | danger (damage per second to the attackers) | time to kill (s) | priority = danger / time to kill |")
+        p("|---|---|---|---|---|")
+        for t, tgt, threat, danger, ttk in x["focus"]:
+            p(f"| {t/1000:.1f} s | {x['units'].get(tgt, {}).get('label', tgt)} | {danger} | {ttk} | {threat/1000:.1f} |")
 
-p("\n## Damage the defence did to the attackers\n")
+p("\n## Damage the defence did to the attackers (sum over all runs)\n")
 p("| mode | defender weapon | hits | damage |")
 p("|---|---|---|---|")
 for mode in MODES:

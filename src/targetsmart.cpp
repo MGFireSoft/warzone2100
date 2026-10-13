@@ -37,6 +37,7 @@
 #include "stats.h"
 #include "structure.h"
 #include "visibility.h"
+#include "combat.h"
 
 #include <cstdlib>
 #include <string>
@@ -780,6 +781,221 @@ const BASE_OBJECT *threatTarget(unsigned player)
 	return best;
 }
 
+/// The kill order mode. For every enemy the side can reach, two figures:
+///  - its danger: the damage per second it does to the side, each shot as it would land on the side's droids
+///    (after their armour and the modifiers for their propulsion and body), times its shots per second and its
+///    chance to hit;
+///  - the time it takes to kill: its hitpoints, less the damage already flying at it, over the damage per second
+///    that the side's droids within reach of it do to it, worked out the same way.
+/// The side fires at the one with the highest danger over time to kill: the damage it stops taking for each
+/// second of fire spent, which is the order that keeps the total damage taken lowest (Smith's rule). The choice
+/// is looked at again every second, and only changed when another target is clearly better, or the current one
+/// falls or gets out of reach.
+struct KillOrderState
+{
+	unsigned targetId = 0;
+	unsigned checkedAt = 0;
+	bool checked = false;
+	double priority = 0;
+};
+
+KillOrderState killOrderStates[MAX_PLAYER_SLOTS];
+
+const unsigned KILL_ORDER_RECHECK = 1000;
+const double KILL_ORDER_SWITCH = 1.3;   ///< how much better another target has to be to be switched to
+
+/// Damage per second that `weapon`, fired by `player`, does to `target`, counting the chance to hit.
+double damagePerSecond(const WEAPON_STATS *weapon, unsigned player, const BASE_OBJECT *target)
+{
+	if (weapon == nullptr || !(weapon->surfaceToAir & SHOOT_ON_GROUND))
+	{
+		return 0;
+	}
+	const double perShot = objGuessFutureDamage(const_cast<WEAPON_STATS *>(weapon), player, const_cast<BASE_OBJECT *>(target));
+	const double shotsPerSecond = weaponROF(*weapon, static_cast<int>(player)) / 60.0;
+	const double hit = weaponLongHit(*weapon, static_cast<int>(player)) / 100.0;
+	return perShot * shotsPerSecond * hit;
+}
+
+int weaponCount(const BASE_OBJECT *psObj)
+{
+	if (psObj->type == OBJ_DROID)
+	{
+		return static_cast<const DROID *>(psObj)->numWeaps;
+	}
+	if (psObj->type == OBJ_STRUCTURE)
+	{
+		return static_cast<int>(static_cast<const STRUCTURE *>(psObj)->numWeaps);
+	}
+	return 0;
+}
+
+const WEAPON_STATS *weaponOf(const BASE_OBJECT *psObj, int slot)
+{
+	if (psObj->type == OBJ_DROID)
+	{
+		return static_cast<const DROID *>(psObj)->getWeaponStats(slot);
+	}
+	return static_cast<const STRUCTURE *>(psObj)->getWeaponStats(slot);
+}
+
+unsigned incomingDamage(const BASE_OBJECT *psObj)
+{
+	if (psObj->type == OBJ_DROID)
+	{
+		const DROID *psDroid = static_cast<const DROID *>(psObj);
+		return psDroid->expectedDamageDirect + psDroid->expectedDamageIndirect;
+	}
+	if (psObj->type == OBJ_STRUCTURE)
+	{
+		return static_cast<const STRUCTURE *>(psObj)->expectedDamage;
+	}
+	return 0;
+}
+
+const BASE_OBJECT *killOrderTarget(unsigned player)
+{
+	KillOrderState &k = killOrderStates[player];
+	const BASE_OBJECT *current = k.targetId != 0 ? getBaseObjFromId(k.targetId) : nullptr;
+	if (current != nullptr && !focusCandidate(current, player))
+	{
+		current = nullptr;
+		k.targetId = 0;
+	}
+	if (k.checked && gameTime - k.checkedAt < KILL_ORDER_RECHECK && current != nullptr)
+	{
+		return current;
+	}
+	if (k.checked && k.checkedAt == gameTime)
+	{
+		return current;
+	}
+	k.checked = true;
+	k.checkedAt = gameTime;
+
+	std::vector<const DROID *> side;
+	for (const DROID *psDroid : gameWorld.objects.droids[player])
+	{
+		if (!psDroid->died && targetModeOf(psDroid) == TargetMode::KillOrder)
+		{
+			side.push_back(psDroid);
+		}
+	}
+	if (side.empty())
+	{
+		k.targetId = 0;
+		return nullptr;
+	}
+
+	struct Rated
+	{
+		const BASE_OBJECT *obj;
+		double priority;
+		double danger;
+		double timeToKill;
+	};
+	const auto rate = [&](const BASE_OBJECT *psObj, Rated &out) {
+		if (!focusCandidate(psObj, player))
+		{
+			return false;
+		}
+		// what the side does to it, from the droids that can reach it
+		double ourDps = 0;
+		for (const DROID *psDroid : side)
+		{
+			for (int i = 0; i < psDroid->numWeaps; i++)
+			{
+				const WEAPON_STATS *weapon = psDroid->getWeaponStats(i);
+				if (weapon == nullptr)
+				{
+					continue;
+				}
+				const int64_t range = proj_GetLongRange(*weapon, static_cast<int>(player));
+				const int64_t dx = psObj->pos.x - psDroid->pos.x;
+				const int64_t dy = psObj->pos.y - psDroid->pos.y;
+				if (dx * dx + dy * dy <= range * range)
+				{
+					ourDps += damagePerSecond(weapon, player, psObj);
+				}
+			}
+		}
+		if (ourDps <= 0)
+		{
+			return false;   // nobody can reach it yet
+		}
+		// what it does to the side, averaged over the side's droids
+		double danger = 0;
+		for (int i = 0; i < weaponCount(psObj); i++)
+		{
+			const WEAPON_STATS *weapon = weaponOf(psObj, i);
+			double sum = 0;
+			for (const DROID *psDroid : side)
+			{
+				sum += damagePerSecond(weapon, psObj->player, psDroid);
+			}
+			danger += sum / static_cast<double>(side.size());
+		}
+		const unsigned incoming = incomingDamage(psObj);
+		const double hitpoints = psObj->body > incoming ? static_cast<double>(psObj->body - incoming) : 1.0;
+		out.obj = psObj;
+		out.danger = danger;
+		out.timeToKill = hitpoints / ourDps;
+		out.priority = danger / out.timeToKill;
+		return true;
+	};
+
+	Rated best{nullptr, -1, 0, 0};
+	Rated currentRated{nullptr, -1, 0, 0};
+	for (unsigned p = 0; p < MAX_PLAYERS; p++)
+	{
+		if (!enemies(p, player))
+		{
+			continue;
+		}
+		const auto consider = [&](const BASE_OBJECT *psObj) {
+			Rated r{nullptr, 0, 0, 0};
+			if (!rate(psObj, r))
+			{
+				return;
+			}
+			if (psObj == current)
+			{
+				currentRated = r;
+			}
+			// the highest priority; with no danger at all, the quickest to kill; then the lower id so every client agrees
+			const bool better = best.obj == nullptr || r.priority > best.priority
+			                    || (r.priority == best.priority && (r.timeToKill < best.timeToKill
+			                        || (r.timeToKill == best.timeToKill && psObj->id < best.obj->id)));
+			if (better)
+			{
+				best = r;
+			}
+		};
+		for (const DROID *psDroid : gameWorld.objects.droids[p])
+		{
+			consider(psDroid);
+		}
+		for (const STRUCTURE *psStructure : gameWorld.objects.structures[p])
+		{
+			consider(psStructure);
+		}
+	}
+
+	// keep the current target unless it is out of reach, or another one is clearly better
+	if (currentRated.obj != nullptr && best.obj != currentRated.obj && best.priority <= currentRated.priority * KILL_ORDER_SWITCH)
+	{
+		best = currentRated;
+	}
+	if (best.obj != nullptr && best.obj->id != k.targetId && fireLogEnabled())
+	{
+		debug(LOG_INFO, "FOCUS t=%u p=%u tgt=%u threat=%lld danger=%.1f ttk=%.1f", gameTime, player, best.obj->id,
+		      static_cast<long long>(best.priority * 1000), best.danger, best.timeToKill);
+	}
+	k.targetId = best.obj != nullptr ? best.obj->id : 0;
+	k.priority = best.priority;
+	return best.obj;
+}
+
 const BASE_OBJECT *sharedTarget(const DROID *attacker)
 {
 	switch (targetModeOf(attacker))
@@ -788,6 +1004,8 @@ const BASE_OBJECT *sharedTarget(const DROID *attacker)
 		return focusTarget(attacker->player);
 	case TargetMode::ThreatFocus:
 		return threatTarget(attacker->player);
+	case TargetMode::KillOrder:
+		return killOrderTarget(attacker->player);
 	default:
 		return nullptr;
 	}
@@ -813,6 +1031,7 @@ bool targetModeKeepsTarget(const DROID *attacker, const BASE_OBJECT *current)
 		return true;
 	case TargetMode::Focus:
 	case TargetMode::ThreatFocus:
+	case TargetMode::KillOrder:
 		return sharedTarget(attacker) == current;
 	default:
 		return false;
