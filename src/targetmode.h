@@ -54,6 +54,22 @@ struct SIMPLE_OBJECT;
 /// something other than the target choice decided what the unit shoots at.
 void targetModeLogShotCheck(const SIMPLE_OBJECT *attacker, const BASE_OBJECT *actual, int weaponSlot);
 
+/// For benchmarks, with WZ_FIRELOG set: a line in the log for every shot fired by anyone (FIRE), every shot that came
+/// down with nothing to hit (LOST), and every bit of damage done (HIT), with who, with what, at whom and how much.
+/// A shot the game has already decided will miss is fired at the ground with no target, so the FIRE line also gives the
+/// shooter's own target for that weapon, which is what it was aiming at.
+void targetModeLogFire(const SIMPLE_OBJECT *shooter, unsigned player, const WEAPON_STATS *weapon, const BASE_OBJECT *target, int weaponSlot);
+void targetModeLogLost(const SIMPLE_OBJECT *shooter, unsigned player, const WEAPON_STATS *weapon);
+void targetModeLogHit(const SIMPLE_OBJECT *shooter, unsigned player, const WEAPON_STATS *weapon, const BASE_OBJECT *target,
+                      unsigned before, unsigned after, bool killed);
+
+/// The focus mode: a large bonus when the target is the one the attacker's side is concentrating on, 0 otherwise.
+int targetModeFocusBonus(const DROID *attacker, const BASE_OBJECT *target);
+
+/// Whether a droid should keep the target it has instead of looking for a better one: in the nearest mode always, in the
+/// focus mode while that target is the one its side is concentrating on.
+bool targetModeKeepsTarget(const DROID *attacker, const BASE_OBJECT *current);
+
 /// Whether the smart mode refuses to shoot through an enemy wall, looking for another target instead.
 bool targetModeSmartWallShots();
 

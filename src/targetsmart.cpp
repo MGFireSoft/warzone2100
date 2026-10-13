@@ -28,6 +28,7 @@
 #include "map.h"
 #include "lib/framework/object_list_iteration.h"
 #include "objects.h"
+#include "objmem.h"
 #include "targetmode.h"
 #include "ai.h"
 #include "game_world.h"
@@ -462,4 +463,194 @@ void targetModeLogShotCheck(const SIMPLE_OBJECT *attackerObj, const BASE_OBJECT 
 	      best != nullptr ? static_cast<int>(kindOf(best)) : -1,
 	      smartTier(attacker, weapon, actual), best != nullptr ? smartTier(attacker, weapon, best) : -2,
 	      static_cast<int>(attacker->order.type), static_cast<int>(attacker->action), best == actual ? 1 : 0);
+}
+
+namespace
+{
+
+bool fireLogEnabled()
+{
+	static const bool enabled = std::getenv("WZ_FIRELOG") != nullptr;
+	return enabled;
+}
+
+unsigned idOf(const SIMPLE_OBJECT *obj)
+{
+	return obj != nullptr ? obj->id : 0;
+}
+
+}
+
+void targetModeLogFire(const SIMPLE_OBJECT *shooter, unsigned player, const WEAPON_STATS *weapon, const BASE_OBJECT *target, int weaponSlot)
+{
+	if (!fireLogEnabled() || weapon == nullptr)
+	{
+		return;
+	}
+	const BASE_OBJECT *aim = nullptr;
+	if (shooter != nullptr && weaponSlot >= 0 && weaponSlot < MAX_WEAPONS)
+	{
+		if (shooter->type == OBJ_DROID)
+		{
+			aim = static_cast<const DROID *>(shooter)->psActionTarget[weaponSlot];
+		}
+		else if (shooter->type == OBJ_STRUCTURE)
+		{
+			aim = static_cast<const STRUCTURE *>(shooter)->psTarget[weaponSlot];
+		}
+	}
+	if (aim == nullptr)
+	{
+		aim = target;
+	}
+	debug(LOG_INFO, "FIRE t=%u p=%u src=%u w=%s tgt=%u aim=%u", gameTime, player, idOf(shooter), weapon->id.toUtf8().c_str(),
+	      target != nullptr ? target->id : 0, aim != nullptr ? aim->id : 0);
+}
+
+void targetModeLogLost(const SIMPLE_OBJECT *shooter, unsigned player, const WEAPON_STATS *weapon)
+{
+	if (!fireLogEnabled() || weapon == nullptr)
+	{
+		return;
+	}
+	debug(LOG_INFO, "LOST t=%u p=%u src=%u w=%s", gameTime, player, idOf(shooter), weapon->id.toUtf8().c_str());
+}
+
+void targetModeLogHit(const SIMPLE_OBJECT *shooter, unsigned player, const WEAPON_STATS *weapon, const BASE_OBJECT *target,
+                      unsigned before, unsigned after, bool killed)
+{
+	if (!fireLogEnabled() || weapon == nullptr || target == nullptr)
+	{
+		return;
+	}
+	debug(LOG_INFO, "HIT t=%u p=%u src=%u w=%s tgt=%u tp=%u dmg=%u left=%u killed=%d", gameTime, player, idOf(shooter),
+	      weapon->id.toUtf8().c_str(), target->id, target->player, before > after ? before - after : 0, killed ? 0 : after, killed ? 1 : 0);
+}
+
+namespace
+{
+
+/// The target a side is concentrating on in the focus mode. Kept as an id, since the object itself may be freed once destroyed.
+struct FocusState
+{
+	unsigned targetId = 0;
+	unsigned checkedAt = 0;
+	bool checked = false;
+};
+
+FocusState focusStates[MAX_PLAYER_SLOTS];
+
+const int FOCUS_BONUS = 50000;
+
+bool focusCandidate(const BASE_OBJECT *psObj, unsigned player)
+{
+	if (psObj == nullptr || psObj->died || !enemies(psObj->player, player) || psObj->visible[player] != UBYTE_MAX)
+	{
+		return false;
+	}
+	if (psObj->type == OBJ_STRUCTURE)
+	{
+		return structureKind(static_cast<const STRUCTURE *>(psObj)) != TargetKind::Wall;
+	}
+	return psObj->type == OBJ_DROID && !static_cast<const DROID *>(psObj)->isVtol();
+}
+
+/// The side's shared target: kept while it stands and can be seen, otherwise the visible enemy nearest the middle of the
+/// side's droids that are in the focus mode. Worked out once per tick.
+const BASE_OBJECT *focusTarget(unsigned player)
+{
+	FocusState &f = focusStates[player];
+	if (f.checked && f.checkedAt == gameTime)
+	{
+		return f.targetId != 0 ? getBaseObjFromId(f.targetId) : nullptr;
+	}
+	f.checked = true;
+	f.checkedAt = gameTime;
+
+	if (f.targetId != 0)
+	{
+		const BASE_OBJECT *current = getBaseObjFromId(f.targetId);
+		if (focusCandidate(current, player))
+		{
+			return current;
+		}
+		f.targetId = 0;
+	}
+
+	int64_t sumX = 0;
+	int64_t sumY = 0;
+	int64_t count = 0;
+	for (const DROID *psDroid : gameWorld.objects.droids[player])
+	{
+		if (!psDroid->died && targetModeOf(psDroid) == TargetMode::Focus)
+		{
+			sumX += psDroid->pos.x;
+			sumY += psDroid->pos.y;
+			count++;
+		}
+	}
+	if (count == 0)
+	{
+		return nullptr;
+	}
+	const Vector2i middle(static_cast<int>(sumX / count), static_cast<int>(sumY / count));
+
+	const BASE_OBJECT *best = nullptr;
+	int64_t bestDistSq = 0;
+	const auto consider = [&](const BASE_OBJECT *psObj) {
+		if (!focusCandidate(psObj, player))
+		{
+			return;
+		}
+		const int64_t dx = psObj->pos.x - middle.x;
+		const int64_t dy = psObj->pos.y - middle.y;
+		const int64_t distSq = dx * dx + dy * dy;
+		if (best == nullptr || distSq < bestDistSq || (distSq == bestDistSq && psObj->id < best->id))
+		{
+			best = psObj;
+			bestDistSq = distSq;
+		}
+	};
+	for (unsigned p = 0; p < MAX_PLAYERS; p++)
+	{
+		if (!enemies(p, player))
+		{
+			continue;
+		}
+		for (const DROID *psDroid : gameWorld.objects.droids[p])
+		{
+			consider(psDroid);
+		}
+		for (const STRUCTURE *psStructure : gameWorld.objects.structures[p])
+		{
+			consider(psStructure);
+		}
+	}
+	f.targetId = best != nullptr ? best->id : 0;
+	return best;
+}
+
+}
+
+int targetModeFocusBonus(const DROID *attacker, const BASE_OBJECT *target)
+{
+	const BASE_OBJECT *focus = focusTarget(attacker->player);
+	return (focus != nullptr && focus == target) ? FOCUS_BONUS : 0;
+}
+
+bool targetModeKeepsTarget(const DROID *attacker, const BASE_OBJECT *current)
+{
+	if (current == nullptr || current->died)
+	{
+		return false;
+	}
+	switch (targetModeOf(attacker))
+	{
+	case TargetMode::Nearest:
+		return true;
+	case TargetMode::Focus:
+		return focusTarget(attacker->player) == current;
+	default:
+		return false;
+	}
 }

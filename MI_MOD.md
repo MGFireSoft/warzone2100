@@ -24,3 +24,6 @@ Los cambios propios se desarrollan en la rama `mi-mod`.
   (artilleria contra artilleria, anti-tanque guarda sus tiros para tanques, bunker buster a estructuras, etc.). Prueba: `--movementbench=assault`.
 - **Medicion de si algo pasa por encima del modo de objetivo** (`tests/movebench/target_agreement.py`): en modo inteligente el 72 % de los disparos
   va al mismo objetivo que elige el modo, el 22 % a un muro que bloquea la linea de tiro (regla del juego, conservada a proposito) y el resto casi nunca peor.
+- **Modos de objetivo "mas cercano" y "concentracion"** (Ctrl+F6 los recorre junto con los otros): el primero se queda con lo primero que tiene a tiro
+  hasta destruirlo; el segundo pone a todo el grupo sobre un mismo objetivo, el mas cercano al centro del grupo. Prueba: `--movementbench=precision`
+  y `tests/movebench/precision_runs.py`, que guarda cada disparo e impacto en `F:\wz-precision`.

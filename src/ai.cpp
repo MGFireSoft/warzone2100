@@ -460,6 +460,10 @@ static SDWORD targetAttackWeightIfGreaterThan(SDWORD currentBest, BASE_OBJECT *p
 			else
 			{
 				attackWeight = targetModeWeight(targetMode, terms);
+				if (targetMode == TargetMode::Focus)
+				{
+					attackWeight += targetModeFocusBonus(psAttackerDroid, psTarget);
+				}
 			}
 		}
 
@@ -526,6 +530,10 @@ static SDWORD targetAttackWeightIfGreaterThan(SDWORD currentBest, BASE_OBJECT *p
 			else
 			{
 				attackWeight = targetModeWeight(targetMode, terms);
+				if (targetMode == TargetMode::Focus)
+				{
+					attackWeight += targetModeFocusBonus(psAttackerDroid, psTarget);
+				}
 			}
 		}
 
@@ -955,6 +963,13 @@ bool aiChooseTarget(BASE_OBJECT *psObj, BASE_OBJECT **ppsTarget, int weapon_slot
 	{
 		WZ_PERF_SCOPE(T_aiChooseTargetDroid);
 		BASE_OBJECT *psCurrTarget = ((DROID *)psObj)->psActionTarget[0];
+
+		// in the nearest and focus modes a droid sticks to the target it has, as long as it can still hit it
+		if (bUpdateTarget && targetModeKeepsTarget((DROID *)psObj, psCurrTarget)
+		    && validTarget(psObj, psCurrTarget, weapon_slot) && aiDroidHasRange((DROID *)psObj, psCurrTarget, weapon_slot))
+		{
+			return false;
+		}
 
 		/* find a new target */
 		int newTargetWeight = aiBestNearestTarget((DROID *)psObj, &psTarget, weapon_slot);

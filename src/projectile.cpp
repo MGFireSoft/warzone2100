@@ -495,6 +495,7 @@ static PROJECTILE* proj_SendProjectileAngledInternal(WEAPON* psWeap, SIMPLE_OBJE
 
 	targetModeLogShot(player, psStats, false);
 	targetModeLogShotCheck(psAttacker, psTarget, weapon_slot);
+	targetModeLogFire(psAttacker, player, psStats, psTarget, weapon_slot);
 
 	PROJECTILE proj(ProjectileTrackerID + ++projectileTrackerIDIncrement, player);
 
@@ -1263,6 +1264,7 @@ static void proj_ImpactFunc(PROJECTILE *psObj)
 	if (psObj->psDest == nullptr)
 	{
 		targetModeLogShot(psObj->player, psStats, true);
+		targetModeLogLost(psObj->psSource, psObj->player, psStats);
 		if (gfxVisible(psObj))
 		{
 			// Get if we are facing or not
@@ -1847,7 +1849,13 @@ static void updateKills(DAMAGE* psDamage)
 
 static int32_t objectDamage(GameWorld& world, DAMAGE *psDamage)
 {
+	const unsigned bodyBefore = psDamage->psDest->body;
 	int32_t relativeDamage = objectDamageDispatch(world, psDamage);
+	if (psDamage->psProjectile != nullptr)
+	{
+		targetModeLogHit(psDamage->psProjectile->psSource, psDamage->psProjectile->player, psDamage->psProjectile->psWStats,
+		                 psDamage->psDest, bodyBefore, psDamage->psDest->body, relativeDamage < 0);
+	}
 
 	if (mayIncreaseExperience(psDamage))
 	{
