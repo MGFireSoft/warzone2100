@@ -109,6 +109,8 @@ const BenchScenario scenarios[] =
 	{ "assault2",            "movebench_assault2.json",            6000, 0x5EEDBEEF, false },
 	// Twelve Python tanks against a small, mixed defence. Run with WZ_FIRELOG to log every shot and every hit.
 	{ "precision",           "movebench_precision.json",           3000, 0x5EEDBEEF, false },
+	// The precision fight with artillery and sensors on both sides. Run with WZ_FIRELOG to log every shot and every hit.
+	{ "precision2",          "movebench_precision2.json",          6000, 0x5EEDBEEF, false },
 	// The parking column past a field carrying stale move targets, and on lighter or lower-skid propulsion.
 	{ "parking_stale",       "movebench_parking_stale.json",        900, 0x5EEDBEEF },
 	{ "parking_light",       "movebench_parking_light.json",        900, 0x5EEDBEEF },

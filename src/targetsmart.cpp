@@ -39,6 +39,7 @@
 #include "visibility.h"
 #include "combat.h"
 
+#include <algorithm>
 #include <cstdlib>
 #include <map>
 #include <set>
@@ -1089,20 +1090,186 @@ double dangerTo(unsigned player, const BASE_OBJECT *target)
 
 }
 
+/// A sensor tower or a sensor droid: what tells artillery where to fire.
+bool isSensor(const BASE_OBJECT *psObj)
+{
+	if (psObj->type == OBJ_DROID)
+	{
+		return static_cast<const DROID *>(psObj)->droidType == DROID_SENSOR;
+	}
+	if (psObj->type == OBJ_STRUCTURE)
+	{
+		const STRUCTURE *psStructure = static_cast<const STRUCTURE *>(psObj);
+		return psStructure->numWeaps == 0 && (structStandardSensor(psStructure) || structCBSensor(psStructure)
+		                                       || structVTOLSensor(psStructure) || structVTOLCBSensor(psStructure));
+	}
+	return false;
+}
+
+bool isArtillery(const BASE_OBJECT *psObj)
+{
+	const TargetKind kind = kindOf(psObj);
+	return kind == TargetKind::ArtilleryUnit || kind == TargetKind::ArtilleryStructure;
+}
+
+/// How long after its last shot enemy artillery still counts as firing.
+const unsigned ARTILLERY_FIRING_TIME = 10000;
+
+/// What a side knows about the enemy's artillery this tick: how dangerous it is in total, how many sensors guide it,
+/// and whether any of it has been firing.
+struct ArtilleryIntel
+{
+	unsigned time = 0;
+	bool known = false;
+	std::map<unsigned, double> danger;   ///< by enemy player
+	std::map<unsigned, int> sensors;     ///< by enemy player
+	bool firing = false;
+};
+
+ArtilleryIntel artilleryIntel[MAX_PLAYER_SLOTS];
+
+const ArtilleryIntel &intelFor(unsigned player)
+{
+	ArtilleryIntel &intel = artilleryIntel[player];
+	if (intel.known && intel.time == gameTime)
+	{
+		return intel;
+	}
+	intel.known = true;
+	intel.time = gameTime;
+	intel.danger.clear();
+	intel.sensors.clear();
+	intel.firing = false;
+	const auto look = [&](const BASE_OBJECT *psObj) {
+		if (psObj->died)
+		{
+			return;
+		}
+		if (isSensor(psObj))
+		{
+			intel.sensors[psObj->player]++;
+			return;
+		}
+		if (!isArtillery(psObj))
+		{
+			return;
+		}
+		bool firedLately = false;
+		for (int i = 0; i < weaponCount(psObj); i++)
+		{
+			const unsigned lastFired = psObj->asWeaps[i].lastFired;
+			firedLately = firedLately || (lastFired != 0 && gameTime - lastFired < ARTILLERY_FIRING_TIME);
+		}
+		// artillery counts once it has been seen or has been shelling the side
+		if (psObj->visible[player] == UBYTE_MAX || firedLately)
+		{
+			intel.danger[psObj->player] += dangerTo(player, psObj);
+			intel.firing = intel.firing || firedLately;
+		}
+	};
+	for (unsigned p = 0; p < MAX_PLAYERS; p++)
+	{
+		if (!enemies(p, player))
+		{
+			continue;
+		}
+		for (const DROID *psDroid : gameWorld.objects.droids[p])
+		{
+			look(psDroid);
+		}
+		for (const STRUCTURE *psStructure : gameWorld.objects.structures[p])
+		{
+			look(psStructure);
+		}
+	}
+	return intel;
+}
+
+/// A sensor does no damage of its own, but it is what lets its side's artillery fire: its danger is that artillery's,
+/// shared out between the sensors that side has.
+double sensorDanger(unsigned player, const BASE_OBJECT *sensor)
+{
+	const ArtilleryIntel &intel = intelFor(player);
+	const auto danger = intel.danger.find(sensor->player);
+	if (danger == intel.danger.end())
+	{
+		return 0;
+	}
+	const auto count = intel.sensors.find(sensor->player);
+	return danger->second / std::max(1, count != intel.sensors.end() ? count->second : 1);
+}
+
+/// What a sensor droid adds by spotting a target: the damage per second its side's artillery in range can put on it.
+double spotterDps(const DROID *spotter, const BASE_OBJECT *target)
+{
+	double dps = 0;
+	for (const DROID *psDroid : gameWorld.objects.droids[spotter->player])
+	{
+		if (psDroid->died)
+		{
+			continue;
+		}
+		for (int i = 0; i < psDroid->numWeaps; i++)
+		{
+			const WEAPON_STATS *weapon = psDroid->getWeaponStats(i);
+			if (weapon == nullptr || proj_Direct(weapon))
+			{
+				continue;
+			}
+			const int64_t range = proj_GetLongRange(*weapon, static_cast<int>(spotter->player));
+			const int64_t dx = target->pos.x - psDroid->pos.x;
+			const int64_t dy = target->pos.y - psDroid->pos.y;
+			if (dx * dx + dy * dy <= range * range)
+			{
+				dps += damagePerSecond(weapon, spotter->player, target);
+			}
+		}
+	}
+	return dps;
+}
+
+/// Bonuses that put whole kinds of target ahead of everything else, for the artillery in the two variants.
+const int TOP_PRIORITY = 2000000;
+const int SECOND_PRIORITY = 1000000;
+
 int targetModeUnitThreatBonus(const DROID *attacker, const WEAPON_STATS *weapon, const BASE_OBJECT *target)
 {
-	if (attacker == nullptr || weapon == nullptr || target == nullptr || target->died)
+	if (attacker == nullptr || target == nullptr || target->died)
 	{
 		return 0;
 	}
-	const double danger = dangerTo(attacker->player, target);
+	const TargetMode mode = targetModeOf(attacker);
+	const bool spotter = attacker->droidType == DROID_SENSOR;
+	const bool artilleryUnit = spotter || (weapon != nullptr && !proj_Direct(weapon));
+	const bool targetIsSensor = isSensor(target);
+	const bool targetIsArtillery = isArtillery(target);
+
+	// the artillery's own order of priority in the two variants
+	int tier = 0;
+	if (artilleryUnit && mode == TargetMode::UnitThreatSensors)
+	{
+		tier = targetIsSensor ? TOP_PRIORITY : (targetIsArtillery ? SECOND_PRIORITY : 0);
+	}
+	else if (artilleryUnit && mode == TargetMode::UnitThreatArtillery)
+	{
+		tier = targetIsArtillery ? TOP_PRIORITY : 0;
+	}
+
+	double danger = dangerTo(attacker->player, target);
+	// A sensor is as dangerous as the artillery it guides: always in the sensors variant, and in the artillery variant
+	// only while the enemy artillery is firing.
+	if (targetIsSensor && (mode == TargetMode::UnitThreatSensors
+	                       || (mode == TargetMode::UnitThreatArtillery && intelFor(attacker->player).firing)))
+	{
+		danger += sensorDanger(attacker->player, target);
+	}
 	if (danger <= 0)
 	{
-		return 0;
+		return tier;
 	}
-	const double myDps = damagePerSecond(weapon, attacker->player, target);
+	const double myDps = spotter ? spotterDps(attacker, target) : damagePerSecond(weapon, attacker->player, target);
 	const unsigned incoming = incomingDamage(target);
 	const double hitpoints = target->body > incoming ? static_cast<double>(target->body - incoming) : 1.0;
 	const double bonus = danger * myDps / hitpoints * UNIT_THREAT_SCALE;
-	return bonus < 1e9 ? static_cast<int>(bonus) : 1000000000;
+	return tier + (bonus < 1e8 ? static_cast<int>(bonus) : 100000000);
 }
