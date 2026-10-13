@@ -232,6 +232,7 @@ int targetModeWeight(TargetMode mode, const TargetTerms &t)
 	case TargetMode::UnitThreatArtillery:
 	case TargetMode::SmartSensors:
 	case TargetMode::SmartSensorsShared:
+	case TargetMode::SmartV4:
 		// the game's own weighting, with a bonus for the shared target on top, see targetModeFocusBonus()
 	case TargetMode::Default:
 	case TargetMode::Count:
@@ -256,6 +257,7 @@ const char *targetModeName(TargetMode mode)
 	case TargetMode::UnitThreatArtillery: return "smart v2, artillery (artillery on enemy artillery)";
 	case TargetMode::SmartSensors: return "smart v3 (the game's choice, with enemy sensors worth the artillery they guide)";
 	case TargetMode::SmartSensorsShared: return "smart v3, shared (as v3, each artillery piece shared between its sensors)";
+	case TargetMode::SmartV4: return "smart v4 (smart v2, with the artillery on enemy sensors first, then enemy artillery)";
 	case TargetMode::Count: break;
 	}
 	return "";

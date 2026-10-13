@@ -465,7 +465,7 @@ static SDWORD targetAttackWeightIfGreaterThan(SDWORD currentBest, BASE_OBJECT *p
 					attackWeight += targetModeFocusBonus(psAttackerDroid, psTarget);
 				}
 				else if (targetMode == TargetMode::UnitThreat || targetMode == TargetMode::UnitThreatSensors
-				         || targetMode == TargetMode::UnitThreatArtillery)
+				         || targetMode == TargetMode::UnitThreatArtillery || targetMode == TargetMode::SmartV4)
 				{
 					attackWeight += targetModeUnitThreatBonus(psAttackerDroid, attackerWeapon, psTarget);
 				}
@@ -544,7 +544,7 @@ static SDWORD targetAttackWeightIfGreaterThan(SDWORD currentBest, BASE_OBJECT *p
 					attackWeight += targetModeFocusBonus(psAttackerDroid, psTarget);
 				}
 				else if (targetMode == TargetMode::UnitThreat || targetMode == TargetMode::UnitThreatSensors
-				         || targetMode == TargetMode::UnitThreatArtillery)
+				         || targetMode == TargetMode::UnitThreatArtillery || targetMode == TargetMode::SmartV4)
 				{
 					attackWeight += targetModeUnitThreatBonus(psAttackerDroid, attackerWeapon, psTarget);
 				}

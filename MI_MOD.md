@@ -19,8 +19,8 @@ Los cambios propios se desarrollan en la rama `mi-mod`.
 - **Las unidades que se corren vuelven a su lugar** una vez que pasa la que las empujo (`moveReturnHome` en `src/move.cpp`).
 - **Evitacion de obstaculos**: el tanque mantiene el lado elegido para esquivar en vez de cambiarlo en cada tick (`collision_avoidance_behavior.cpp`).
 - **Modos de objetivo, solo para pruebas** (`src/targetweights.*`, `src/targetmode.*`, `src/targetsmart.cpp`): por defecto, por tipo,
-  inteligente, mas cercano, concentracion, concentracion por amenaza orden de eliminacion (peligro / tiempo para matarlo), inteligente v2 (amenaza por unidad) y sus submodos sensores y artilleria, e inteligente v3 (criterio normal + sensores, suma o repartido). Ya no se eligen en el juego (se quito el selector Ctrl+F6/F7):
-  se activan con la variable de entorno `WZ_TARGETMODE` (0 a 11) para los escenarios de prueba. En el juego, todas las unidades usan el criterio normal.
+  inteligente, mas cercano, concentracion, concentracion por amenaza orden de eliminacion (peligro / tiempo para matarlo), inteligente v2 (amenaza por unidad) y sus submodos sensores y artilleria, inteligente v3 (criterio normal + sensores, suma o repartido) e inteligente v4. Ya no se eligen en el juego (se quito el selector Ctrl+F6/F7):
+  se activan con la variable de entorno `WZ_TARGETMODE` (0 a 12) para los escenarios de prueba. En el juego, todas las unidades usan el criterio normal.
 - **Modo de objetivo inteligente por tipo de arma** (`src/targetweights.cpp`, `src/targetsmart.cpp`): cada arma tiene su orden de prioridad
   (artilleria contra artilleria, anti-tanque guarda sus tiros para tanques, bunker buster a estructuras, etc.). Prueba: `--movementbench=assault`.
 - **Medicion de si algo pasa por encima del modo de objetivo** (`tests/movebench/target_agreement.py`): en modo inteligente el 72 % de los disparos
@@ -42,3 +42,6 @@ Los cambios propios se desarrollan en la rama `mi-mod`.
   (+976 +/- 371 de dano recibido sumando, +229 +/- 286 repartido). Sin el termino de amenaza, los bunker busters se van tras los sensores
   y dejan vivos los bunkers, y el atacante queda quieto bajo fuego de Hellstorm. En `precision` empata con el criterio normal.
   El mejor sigue siendo v2 sensores.
+- **Inteligente v4** (modo 12): v2 para todas las unidades, y solo la artilleria propia (y el tanque sensor) prioriza sensores enemigos y
+  luego artilleria enemiga. En `precision2`, 5 combates: -1.442 +/- 453 de dano recibido contra el criterio normal (2.914 contra 4.356),
+  practicamente igual que v2 sensores en las mismas condiciones (2.734), sin que las unidades de asalto persigan sensores.

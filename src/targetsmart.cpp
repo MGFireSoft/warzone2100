@@ -1244,9 +1244,10 @@ int targetModeUnitThreatBonus(const DROID *attacker, const WEAPON_STATS *weapon,
 	const bool targetIsSensor = isSensor(target);
 	const bool targetIsArtillery = isArtillery(target);
 
-	// the artillery's own order of priority in the two variants
+	// the artillery's own order of priority in the variants; v4 takes it from the sensors variant, and leaves every other
+	// unit on plain v2, so that assault units do not go after sensors
 	int tier = 0;
-	if (artilleryUnit && mode == TargetMode::UnitThreatSensors)
+	if (artilleryUnit && (mode == TargetMode::UnitThreatSensors || mode == TargetMode::SmartV4))
 	{
 		tier = targetIsSensor ? TOP_PRIORITY : (targetIsArtillery ? SECOND_PRIORITY : 0);
 	}

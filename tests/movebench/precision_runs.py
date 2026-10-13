@@ -7,12 +7,15 @@ EXE = r"F:\wz-build\src\warzone2100.exe"
 OUT = r"F:\wz-precision"
 # the modes compared, by name, with the WZ_TARGETMODE number of each
 MODE_NUMBERS = {"default": 0, "by type": 1, "smart": 2, "nearest": 3, "focus": 4, "threat focus": 5, "kill order": 6,
-                "smart v2": 7, "smart v2 sensors": 8, "smart v2 artillery": 9, "smart v3": 10, "smart v3 shared": 11}
-# usage: precision_runs.py [scenario] [mode,mode,...]
+                "smart v2": 7, "smart v2 sensors": 8, "smart v2 artillery": 9, "smart v3": 10, "smart v3 shared": 11, "smart v4": 12}
+# usage: precision_runs.py [scenario] [mode,mode,...] [number of runs]
 SCENARIO = sys.argv[1] if len(sys.argv) > 1 else "precision"
 MODES = sys.argv[2].split(",") if len(sys.argv) > 2 else ["default", "smart v2"]
 # ten different starts: five spawn arrangements, each with two random seeds
 RUNS = [(arr, seed) for seed in (None, 111) for arr in range(5)]
+# usage, third argument: how many of those starts to run, from the first
+if len(sys.argv) > 3:
+    RUNS = RUNS[:int(sys.argv[3])]
 
 unit_re = re.compile(r"UNIT id=(\d+) side=(\w+) kind=(\w+) label=(.+?)\s*$")
 battle_re = re.compile(r"BATTLE t=(\d+) attacker=(\d+) health=(\d+) defender=(\d+) health=(\d+) structures=(\d+) health=(\d+)")
