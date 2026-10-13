@@ -20,55 +20,13 @@
 */
 
 #include "lib/framework/frame.h"
-#include "lib/framework/object_list_iteration.h"
 #include "targetmode.h"
-#include "game_world.h"
 #include "objects.h"
-#include "console.h"
 
 #include <cstdlib>
-#include <string>
 
-namespace
-{
-
-const unsigned NUM_GROUPS = 10;
-
-TargetMode groupModes[NUM_GROUPS] = {};
-
-/// The group the whole current selection belongs to, or -1 if it is not a single group.
-int selectedGroup()
-{
-	int found = -1;
-	for (const DROID *psDroid : gameWorld.objects.droids[selectedPlayer])
-	{
-		if (!psDroid->selected)
-		{
-			continue;
-		}
-		if (psDroid->group >= NUM_GROUPS)
-		{
-			return -1;
-		}
-		if (found != -1 && found != psDroid->group)
-		{
-			return -1;
-		}
-		found = psDroid->group;
-	}
-	return found;
-}
-
-void setGroupMode(int group, TargetMode mode)
-{
-	groupModes[group] = mode;
-	const std::string text = "Group " + std::to_string(group) + " target mode: " + targetModeName(mode);
-	addConsoleMessage(text.c_str(), DEFAULT_JUSTIFY, INFO_MESSAGE);
-}
-
-}
-
-/// For benchmarks: WZ_TARGETMODE=<number> gives every droid of the local player that mode, whatever its group.
+/// For benchmarks: WZ_TARGETMODE=<number> gives every droid of the local player that mode. Without it, every droid
+/// chooses its targets the game's usual way.
 static int benchModeOverride()
 {
 	static const int mode = [] {
@@ -81,36 +39,9 @@ static int benchModeOverride()
 TargetMode targetModeOf(const DROID *psDroid)
 {
 	const int override = benchModeOverride();
-	if (override >= 0 && override < static_cast<int>(TargetMode::Count))
+	if (override > 0 && override < static_cast<int>(TargetMode::Count) && psDroid->player == selectedPlayer)
 	{
-		return psDroid->player == selectedPlayer ? static_cast<TargetMode>(override) : TargetMode::Default;
+		return static_cast<TargetMode>(override);
 	}
-	if (psDroid->player != selectedPlayer || psDroid->group >= NUM_GROUPS)
-	{
-		return TargetMode::Default;
-	}
-	return groupModes[psDroid->group];
-}
-
-void kf_TargetModeNext()
-{
-	const int group = selectedGroup();
-	if (group < 0)
-	{
-		addConsoleMessage("Target modes need the selection to be one group (Ctrl+number)", DEFAULT_JUSTIFY, INFO_MESSAGE);
-		return;
-	}
-	const unsigned next = (static_cast<unsigned>(groupModes[group]) + 1) % static_cast<unsigned>(TargetMode::Count);
-	setGroupMode(group, static_cast<TargetMode>(next));
-}
-
-void kf_TargetModeDefault()
-{
-	const int group = selectedGroup();
-	if (group < 0)
-	{
-		addConsoleMessage("Target modes need the selection to be one group (Ctrl+number)", DEFAULT_JUSTIFY, INFO_MESSAGE);
-		return;
-	}
-	setGroupMode(group, TargetMode::Default);
+	return TargetMode::Default;
 }

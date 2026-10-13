@@ -632,9 +632,172 @@ const BASE_OBJECT *focusTarget(unsigned player)
 
 }
 
+namespace
+{
+
+/// How much damage an enemy can do to the side's droids in a minute: for each of its weapons that can hit the ground,
+/// damage times shots per minute, times what that kind of weapon does against the side's propulsions on average.
+int64_t threatOf(const BASE_OBJECT *psObj, const int modifierFor[WE_NUMEFFECTS])
+{
+	int numWeaps = 0;
+	if (psObj->type == OBJ_DROID)
+	{
+		numWeaps = static_cast<const DROID *>(psObj)->numWeaps;
+	}
+	else if (psObj->type == OBJ_STRUCTURE)
+	{
+		numWeaps = static_cast<int>(static_cast<const STRUCTURE *>(psObj)->numWeaps);
+	}
+	int64_t threat = 0;
+	for (int i = 0; i < numWeaps; i++)
+	{
+		const WEAPON_STATS *weapon = (psObj->type == OBJ_DROID)
+		                             ? static_cast<const DROID *>(psObj)->getWeaponStats(i)
+		                             : static_cast<const STRUCTURE *>(psObj)->getWeaponStats(i);
+		if (weapon == nullptr || !(weapon->surfaceToAir & SHOOT_ON_GROUND) || weapon->weaponEffect >= WE_NUMEFFECTS)
+		{
+			continue;
+		}
+		threat += static_cast<int64_t>(weaponDamage(*weapon, psObj->player)) * weaponROF(*weapon, psObj->player)
+		          * modifierFor[weapon->weaponEffect] / 100;
+	}
+	return threat;
+}
+
+/// The target a side is concentrating on in the threat focus mode, kept as an id.
+FocusState threatStates[MAX_PLAYER_SLOTS];
+
+/// The most dangerous visible enemy that at least one of the side's droids in the threat focus mode can reach. Kept
+/// while it stands and someone can still reach it, worked out once per tick.
+const BASE_OBJECT *threatTarget(unsigned player)
+{
+	FocusState &f = threatStates[player];
+	if (f.checked && f.checkedAt == gameTime)
+	{
+		return f.targetId != 0 ? getBaseObjFromId(f.targetId) : nullptr;
+	}
+	f.checked = true;
+	f.checkedAt = gameTime;
+
+	// the side's droids in this mode, with how far each can shoot, and what each kind of weapon does to them on average
+	struct Shooter
+	{
+		Vector2i pos;
+		int64_t range;
+	};
+	std::vector<Shooter> shooters;
+	int64_t modifierSum[WE_NUMEFFECTS] = {};
+	for (const DROID *psDroid : gameWorld.objects.droids[player])
+	{
+		if (psDroid->died || targetModeOf(psDroid) != TargetMode::ThreatFocus)
+		{
+			continue;
+		}
+		const WEAPON_STATS *weapon = psDroid->getWeaponStats(0);
+		if (weapon != nullptr)
+		{
+			shooters.push_back({psDroid->pos.xy(), static_cast<int64_t>(proj_GetLongRange(*weapon, player))});
+		}
+		for (int e = 0; e < WE_NUMEFFECTS; e++)
+		{
+			modifierSum[e] += asWeaponModifier[e][psDroid->getPropulsionStats()->propulsionType];
+		}
+	}
+	if (shooters.empty())
+	{
+		f.targetId = 0;
+		return nullptr;
+	}
+	int modifierFor[WE_NUMEFFECTS];
+	for (int e = 0; e < WE_NUMEFFECTS; e++)
+	{
+		modifierFor[e] = static_cast<int>(modifierSum[e] / static_cast<int64_t>(shooters.size()));
+	}
+
+	const auto reachable = [&](const BASE_OBJECT *psObj) {
+		for (const Shooter &sh : shooters)
+		{
+			const int64_t dx = psObj->pos.x - sh.pos.x;
+			const int64_t dy = psObj->pos.y - sh.pos.y;
+			if (dx * dx + dy * dy <= sh.range * sh.range)
+			{
+				return true;
+			}
+		}
+		return false;
+	};
+
+	if (f.targetId != 0)
+	{
+		const BASE_OBJECT *current = getBaseObjFromId(f.targetId);
+		if (focusCandidate(current, player) && reachable(current))
+		{
+			return current;
+		}
+		f.targetId = 0;
+	}
+
+	const BASE_OBJECT *best = nullptr;
+	int64_t bestThreat = -1;
+	const auto consider = [&](const BASE_OBJECT *psObj) {
+		if (!focusCandidate(psObj, player) || !reachable(psObj))
+		{
+			return;
+		}
+		const int64_t threat = threatOf(psObj, modifierFor);
+		// the most dangerous first; between equals, the one closer to dying, then the lower id so every client agrees
+		if (best == nullptr || threat > bestThreat
+		    || (threat == bestThreat && (psObj->body < best->body || (psObj->body == best->body && psObj->id < best->id))))
+		{
+			best = psObj;
+			bestThreat = threat;
+		}
+	};
+	// says in the benchmark log which target the side turned on, and how dangerous it was reckoned to be
+	const auto logChoice = [&]() {
+		if (best != nullptr && fireLogEnabled())
+		{
+			debug(LOG_INFO, "FOCUS t=%u p=%u tgt=%u threat=%lld", gameTime, player, best->id, static_cast<long long>(bestThreat));
+		}
+	};
+	for (unsigned p = 0; p < MAX_PLAYERS; p++)
+	{
+		if (!enemies(p, player))
+		{
+			continue;
+		}
+		for (const DROID *psDroid : gameWorld.objects.droids[p])
+		{
+			consider(psDroid);
+		}
+		for (const STRUCTURE *psStructure : gameWorld.objects.structures[p])
+		{
+			consider(psStructure);
+		}
+	}
+	f.targetId = best != nullptr ? best->id : 0;
+	logChoice();
+	return best;
+}
+
+const BASE_OBJECT *sharedTarget(const DROID *attacker)
+{
+	switch (targetModeOf(attacker))
+	{
+	case TargetMode::Focus:
+		return focusTarget(attacker->player);
+	case TargetMode::ThreatFocus:
+		return threatTarget(attacker->player);
+	default:
+		return nullptr;
+	}
+}
+
+}
+
 int targetModeFocusBonus(const DROID *attacker, const BASE_OBJECT *target)
 {
-	const BASE_OBJECT *focus = focusTarget(attacker->player);
+	const BASE_OBJECT *focus = sharedTarget(attacker);
 	return (focus != nullptr && focus == target) ? FOCUS_BONUS : 0;
 }
 
@@ -649,7 +812,8 @@ bool targetModeKeepsTarget(const DROID *attacker, const BASE_OBJECT *current)
 	case TargetMode::Nearest:
 		return true;
 	case TargetMode::Focus:
-		return focusTarget(attacker->player) == current;
+	case TargetMode::ThreatFocus:
+		return sharedTarget(attacker) == current;
 	default:
 		return false;
 	}

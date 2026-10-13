@@ -225,6 +225,8 @@ int targetModeWeight(TargetMode mode, const TargetTerms &t)
 		// only the distance counts; the constant keeps the weight positive, as the game takes zero for no target.
 		// The focus mode adds a bonus for the shared target on top of this, see targetModeFocusBonus().
 		return 1000 + t.distance;
+	case TargetMode::ThreatFocus:
+		// the game's own weighting, with a bonus for the shared target on top, see targetModeFocusBonus()
 	case TargetMode::Default:
 	case TargetMode::Count:
 		break;
@@ -241,6 +243,7 @@ const char *targetModeName(TargetMode mode)
 	case TargetMode::Smart: return "smart (each weapon goes for what it is meant for)";
 	case TargetMode::Nearest: return "nearest (the first thing in reach, until it is destroyed)";
 	case TargetMode::Focus: return "focus (everyone on one target, then the nearest next one)";
+	case TargetMode::ThreatFocus: return "threat focus (everyone on the most dangerous target, then the next)";
 	case TargetMode::Count: break;
 	}
 	return "";

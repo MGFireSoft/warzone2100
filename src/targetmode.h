@@ -19,12 +19,11 @@
 	Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 */
 /** \file
- *  Target modes for the Ctrl+number groups.
+ *  Target modes, for experiments.
  *
- *  A group of the local player can be given a mode that changes how its droids pick targets
- *  (see targetweights.h). For now the setting is local state, so it only affects games where
- *  every droid is simulated by this client, such as single player or against the AI. Later it is
- *  meant to become an order of each unit and factory, which is synchronised.
+ *  A mode changes how the local player's droids pick targets (see targetweights.h). There is no way to choose one in
+ *  the game: the WZ_TARGETMODE environment variable sets it for the movement benchmarks, which compare the modes, and
+ *  without it every droid picks its targets the game's usual way.
  */
 
 #pragma once
@@ -63,20 +62,16 @@ void targetModeLogLost(const SIMPLE_OBJECT *shooter, unsigned player, const WEAP
 void targetModeLogHit(const SIMPLE_OBJECT *shooter, unsigned player, const WEAPON_STATS *weapon, const BASE_OBJECT *target,
                       unsigned before, unsigned after, bool killed);
 
-/// The focus mode: a large bonus when the target is the one the attacker's side is concentrating on, 0 otherwise.
+/// The focus modes: a large bonus when the target is the one the attacker's side is concentrating on, 0 otherwise.
 int targetModeFocusBonus(const DROID *attacker, const BASE_OBJECT *target);
 
 /// Whether a droid should keep the target it has instead of looking for a better one: in the nearest mode always, in the
-/// focus mode while that target is the one its side is concentrating on.
+/// focus modes while that target is the one its side is concentrating on.
 bool targetModeKeepsTarget(const DROID *attacker, const BASE_OBJECT *current);
 
 /// Whether the smart mode refuses to shoot through an enemy wall, looking for another target instead.
 bool targetModeSmartWallShots();
 
-/// The mode that applies to a droid: its group's mode if it belongs to one of the local player's groups,
-/// the game's own weighting otherwise.
+/// The mode that applies to a droid: the one set by WZ_TARGETMODE for the local player's droids, the game's own
+/// weighting otherwise.
 TargetMode targetModeOf(const DROID *psDroid);
-
-/// Hotkey handlers, for the group the current selection belongs to.
-void kf_TargetModeNext();
-void kf_TargetModeDefault();

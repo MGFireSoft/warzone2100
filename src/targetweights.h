@@ -38,6 +38,7 @@ enum class TargetMode
 	Smart,       ///< each kind of weapon goes for the targets it is meant for, in a fixed order of priority
 	Nearest,     ///< the first thing within reach, kept until it is destroyed
 	Focus,       ///< the whole side fires at one target until it is destroyed, then at the nearest next one
+	ThreatFocus, ///< the whole side fires at the most dangerous target it can reach, then the next most dangerous
 	Count,
 };
 

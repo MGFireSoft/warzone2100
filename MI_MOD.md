@@ -18,12 +18,15 @@ Los cambios propios se desarrollan en la rama `mi-mod`.
   Se manejan con Ctrl+F1 (forma), Ctrl+F2 (orden), Ctrl+F3 (separacion), Ctrl+F5 (velocidad), Ctrl+F4 (apagar) sobre un grupo Ctrl+numero.
 - **Las unidades que se corren vuelven a su lugar** una vez que pasa la que las empujo (`moveReturnHome` en `src/move.cpp`).
 - **Evitacion de obstaculos**: el tanque mantiene el lado elegido para esquivar en vez de cambiarlo en cada tick (`collision_avoidance_behavior.cpp`).
-- **Modos de objetivo por grupo** (`src/targetweights.*`, `src/targetmode.*`): por defecto, por tipo e inteligente.
-  Ctrl+F6 siguiente modo, Ctrl+F7 vuelve al por defecto, sobre un grupo Ctrl+numero.
+- **Modos de objetivo, solo para pruebas** (`src/targetweights.*`, `src/targetmode.*`, `src/targetsmart.cpp`): por defecto, por tipo,
+  inteligente, mas cercano, concentracion y concentracion por amenaza. Ya no se eligen en el juego (se quito el selector Ctrl+F6/F7):
+  se activan con la variable de entorno `WZ_TARGETMODE` (0 a 5) para los escenarios de prueba. En el juego, todas las unidades usan el criterio normal.
 - **Modo de objetivo inteligente por tipo de arma** (`src/targetweights.cpp`, `src/targetsmart.cpp`): cada arma tiene su orden de prioridad
   (artilleria contra artilleria, anti-tanque guarda sus tiros para tanques, bunker buster a estructuras, etc.). Prueba: `--movementbench=assault`.
 - **Medicion de si algo pasa por encima del modo de objetivo** (`tests/movebench/target_agreement.py`): en modo inteligente el 72 % de los disparos
   va al mismo objetivo que elige el modo, el 22 % a un muro que bloquea la linea de tiro (regla del juego, conservada a proposito) y el resto casi nunca peor.
-- **Modos de objetivo "mas cercano" y "concentracion"** (Ctrl+F6 los recorre junto con los otros): el primero se queda con lo primero que tiene a tiro
+- **Modos de objetivo "mas cercano" y "concentracion"**: el primero se queda con lo primero que tiene a tiro
   hasta destruirlo; el segundo pone a todo el grupo sobre un mismo objetivo, el mas cercano al centro del grupo. Prueba: `--movementbench=precision`
   y `tests/movebench/precision_runs.py`, que guarda cada disparo e impacto en `F:\wz-precision`.
+- **Conclusion de las pruebas de objetivos**: ningun modo supera al criterio normal del juego en el escenario `precision`; la concentracion
+  por amenaza lo empata (118,5 s contra 116,5 s, misma vida restante) y mata los bunkers antes, pero tarda mas con la torre Tank Killer.

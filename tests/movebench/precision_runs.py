@@ -5,7 +5,7 @@ import collections, csv, json, os, re, statistics, subprocess
 
 EXE = r"F:\wz-build\src\warzone2100.exe"
 OUT = r"F:\wz-precision"
-MODES = ["default", "by type", "smart", "nearest", "focus"]
+MODES = ["default", "by type", "smart", "nearest", "focus", "threat focus"]
 RUNS = range(5)
 
 unit_re = re.compile(r"UNIT id=(\d+) side=(\w+) kind=(\w+) label=(.+?)\s*$")
@@ -14,6 +14,7 @@ fire_re = re.compile(r"FIRE t=(\d+) p=(\d+) src=(\d+) w=(\S+) tgt=(\d+) aim=(\d+
 lost_re = re.compile(r"LOST t=(\d+) p=(\d+) src=(\d+) w=(\S+)")
 hit_re = re.compile(r"HIT t=(\d+) p=(\d+) src=(\d+) w=(\S+) tgt=(\d+) tp=(\d+) dmg=(\d+) left=(\d+) killed=(\d)")
 state_re = re.compile(r"STATE t=(\d+) (.*)$")
+focus_re = re.compile(r"FOCUS t=(\d+) p=0 tgt=(\d+) threat=(-?\d+)")
 
 WEAPON_NAMES = {
     "MG4ROTARYMk1": "Assault Gun", "Rocket-BB": "Bunker Buster", "Rocket-HvyA-T": "Tank Killer", "Mortar2Mk1": "Bombard",
@@ -39,7 +40,12 @@ for mode_index, mode in enumerate(MODES):
         events = []
         battles = []
         last_state = None
+        focus = []
         for line in out.splitlines():
+            m = focus_re.search(line)
+            if m:
+                focus.append((int(m.group(1)), int(m.group(2)), int(m.group(3))))
+                continue
             m = unit_re.search(line)
             if m:
                 units[int(m.group(1))] = {"side": m.group(2), "kind": m.group(3), "label": m.group(4)}
@@ -87,7 +93,7 @@ for mode_index, mode in enumerate(MODES):
         deaths = {e["target"]: (e["t"], e["shooter"], e["weapon"]) for e in events if e["event"] == "kill"}
         runs.append({"mode": mode, "run": run, "units": units, "events": events, "t_done": t_done, "t_units": t_units,
                      "attackers_left": end[1] if end else None, "attacker_health": end[2] if end else None, "deaths": deaths,
-                     "last_state": last_state})
+                     "last_state": last_state, "focus": focus})
     print("done", mode, flush=True)
 
 
@@ -179,6 +185,14 @@ for label in labels:
                     killers[weapon_name(w)] += 1
         cells.append(f"{mean(times)/1000:.0f} s, " + ", ".join(f"{k} {v}" for k, v in killers.most_common()) if times else "survived")
     p(f"| {label} | " + " | ".join(cells) + " |")
+
+for x in runs:
+    if x["mode"] == "threat focus" and x["run"] == 0 and x["focus"]:
+        p("\n## Order in which the threat focus mode turned on the defence (first run)\n")
+        p("| time | target | threat (damage per minute against the attackers) |")
+        p("|---|---|---|")
+        for t, tgt, threat in x["focus"]:
+            p(f"| {t/1000:.1f} s | {x['units'].get(tgt, {}).get('label', tgt)} | {threat} |")
 
 p("\n## Damage the defence did to the attackers\n")
 p("| mode | defender weapon | hits | damage |")
